@@ -1,0 +1,60 @@
+{
+  "preset": "diamond205",
+  "config": {
+    "layerA": "hx_models/animated/hx_a_diamond_205A.glb",
+    "layerB": "hx_models/animated/hx_a_diamond_205B.glb",
+    "room": "hx_models/static/hex_room_enclose.glb",
+    "paletteA": [
+      "#a0168f",
+      "#ff5f05",
+      "#ffd500",
+      "#ffeacf",
+      "#61e20d",
+      "#ffd19c",
+      "#3bdaa3",
+      "#004ea6",
+      "#00a885",
+      "#02ef34",
+      "#746a5e",
+      "#fea900"
+    ],
+    "paletteB": [
+      "#5a87bc",
+      "#306e88",
+      "#6f7572",
+      "#ebb236",
+      "#d0f925",
+      "#9ebccc",
+      "#b2a99e",
+      "#fb6756",
+      "#dcdcdc",
+      "#f58ed6",
+      "#daf208",
+      "#dbd6ce"
+    ],
+    "scrollSpeedA": null,
+    "scrollSpeedB": null,
+    "scrollDirectionB": -1,
+    "cameraPos": [
+      0,
+      2,
+      7
+    ],
+    "cameraLookAt": [
+      0,
+      0,
+      -6
+    ],
+    "cameraFOV": 55,
+    "bgColor": 0,
+    "vignette": true,
+    "vignetteIntensity": 0.6,
+    "assetBase": "/Users/hexebotzero/hexeosis_asset_kit"
+  },
+  "width": 1024,
+  "height": 1024,
+  "frames": 90,
+  "fps": 30,
+  "animDuration": 3,
+  "rendered": "2026-03-22T02:14:03.167Z"
+}

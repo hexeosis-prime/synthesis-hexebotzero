@@ -1,0 +1,60 @@
+{
+  "preset": "squares201",
+  "config": {
+    "layerA": "hx_models/animated/hx_a_squares_201A.glb",
+    "layerB": "hx_models/animated/hx_a_squares_201B.glb",
+    "room": "hx_models/static/hex_room_enclose.glb",
+    "paletteA": [
+      "#060d55",
+      "#070f79",
+      "#0715c1",
+      "#171efb",
+      "#22ded5",
+      "#6fcc2b",
+      "#b8bb29",
+      "#d57d0e",
+      "#e74e40",
+      "#c2151e",
+      "#d82a62",
+      "#7d0276"
+    ],
+    "paletteB": [
+      "#fed7a0",
+      "#040101",
+      "#ffbf7c",
+      "#020200",
+      "#ffd548",
+      "#020201",
+      "#93dc26",
+      "#030403",
+      "#21b64f",
+      "#000201",
+      "#25ad41",
+      "#000101"
+    ],
+    "scrollSpeedA": null,
+    "scrollSpeedB": null,
+    "scrollDirectionB": 1,
+    "cameraPos": [
+      0,
+      0,
+      5
+    ],
+    "cameraLookAt": [
+      0,
+      0,
+      -10
+    ],
+    "cameraFOV": 65,
+    "bgColor": 0,
+    "vignette": true,
+    "vignetteIntensity": 0.55,
+    "assetBase": "/Users/hexebotzero/hexeosis_asset_kit"
+  },
+  "width": 1024,
+  "height": 1024,
+  "frames": 90,
+  "fps": 30,
+  "animDuration": 3,
+  "rendered": "2026-03-22T02:13:44.869Z"
+}

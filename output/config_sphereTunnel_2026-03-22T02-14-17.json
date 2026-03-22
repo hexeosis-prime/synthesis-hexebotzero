@@ -1,0 +1,47 @@
+{
+  "preset": "sphereTunnel",
+  "config": {
+    "layerA": "hx_models/animated/hx_a_sphere-tunnel.glb",
+    "layerB": null,
+    "room": null,
+    "paletteA": [
+      "#0e8ebd",
+      "#2475cb",
+      "#646ebf",
+      "#b374b1",
+      "#e77aa1",
+      "#fc8083",
+      "#fd8e61",
+      "#f3a63f",
+      "#d5b931",
+      "#91c137",
+      "#46ba59",
+      "#19a98e"
+    ],
+    "paletteB": null,
+    "scrollSpeedA": null,
+    "scrollSpeedB": null,
+    "scrollDirectionB": 1,
+    "cameraPos": [
+      0,
+      0,
+      2
+    ],
+    "cameraLookAt": [
+      0,
+      0,
+      -20
+    ],
+    "cameraFOV": 70,
+    "bgColor": 0,
+    "vignette": true,
+    "vignetteIntensity": 0.7,
+    "assetBase": "/Users/hexebotzero/hexeosis_asset_kit"
+  },
+  "width": 1024,
+  "height": 1024,
+  "frames": 90,
+  "fps": 30,
+  "animDuration": 3,
+  "rendered": "2026-03-22T02:14:17.116Z"
+}

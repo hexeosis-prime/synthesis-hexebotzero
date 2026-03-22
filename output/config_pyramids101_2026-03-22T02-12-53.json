@@ -1,0 +1,60 @@
+{
+  "preset": "pyramids101",
+  "config": {
+    "layerA": "hx_models/animated/hx_a_pyramids_101A.glb",
+    "layerB": "hx_models/animated/hx_a_pyramids_101B.glb",
+    "room": "hx_models/static/hex_room_enclose.glb",
+    "paletteA": [
+      "#0e8ebd",
+      "#2475cb",
+      "#646ebf",
+      "#b374b1",
+      "#e77aa1",
+      "#fc8083",
+      "#fd8e61",
+      "#f3a63f",
+      "#d5b931",
+      "#91c137",
+      "#46ba59",
+      "#19a98e"
+    ],
+    "paletteB": [
+      "#010100",
+      "#f3d613",
+      "#020200",
+      "#fca63e",
+      "#040101",
+      "#f52a80",
+      "#010101",
+      "#00b4b2",
+      "#000201",
+      "#02d57d",
+      "#000401",
+      "#50c725"
+    ],
+    "scrollSpeedA": null,
+    "scrollSpeedB": null,
+    "scrollDirectionB": 1,
+    "cameraPos": [
+      0,
+      3,
+      10
+    ],
+    "cameraLookAt": [
+      0,
+      0,
+      -8
+    ],
+    "cameraFOV": 50,
+    "bgColor": 0,
+    "vignette": true,
+    "vignetteIntensity": 0.5,
+    "assetBase": "/Users/hexebotzero/hexeosis_asset_kit"
+  },
+  "width": 1024,
+  "height": 1024,
+  "frames": 90,
+  "fps": 30,
+  "animDuration": 3,
+  "rendered": "2026-03-22T02:12:53.078Z"
+}
