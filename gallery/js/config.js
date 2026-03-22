@@ -94,7 +94,7 @@ export const PIECES = [
 
     onChain: {
       ipfsMetadataCid: 'QmNtWyAjJp9LbieCDWrSmGjZFhyrF6kGdVz22uAgSMQazT',
-      ipfsAnimationCid: 'PENDING_HTML_UPLOAD',
+      ipfsAnimationCid: 'QmYaxig2z6ouCYupEAoJ3BTypSBwvjn8GhSU5znDK5GCrt',
     },
 
     attributes: [
@@ -111,12 +111,12 @@ export const PIECES = [
   },
 
   {
-    id:          'synthesis_102b',
+    id:          'squares201',
     tokenId:     2,
-    title:       'SYNTHESIS 102B',
-    description: 'Layer B of the SYNTHESIS 102 composition. Same geometry as 102A with inverted scroll direction and warm palette variant. Created by HEXEBOTZERO using hexeosis\'s geometric toolkit.',
+    title:       '⬡ squares201 — HEXEBOTZERO x hexeosis',
+    description: 'Architectural corridor of flat surfaces receding to infinity. Spectral hot neons against warm blacks. One-point perspective creates an endless hallway where scrolling stripes generate the sensation of perpetual forward motion.',
 
-    thumbnailCid: 'IPFS_PLACEHOLDER_CID_102B_GIF',
+    thumbnailCid: 'QmSQfS6f25S339ZY7HmZ2CvMHjLn8xWFa87Zxtuq9XgZUf',
 
     models: {
       layerA: './models/hx_a_hex_102A.glb',
@@ -124,40 +124,138 @@ export const PIECES = [
       room:   './models/hex_room_enclose.glb',
     },
 
+    paletteA: [
+      '#060d55', '#070f79', '#0715c1', '#171efb', '#22ded5', '#6fcc2b',
+      '#b8bb29', '#d57d0e', '#e74e40', '#c2151e', '#d82a62', '#7d0276',
+    ],
+    paletteB: [
+      '#fed7a0', '#040101', '#ffbf7c', '#020200', '#ffd548', '#020201',
+      '#93dc26', '#030403', '#21b64f', '#000201', '#25ad41', '#000101',
+    ],
     palette: [
-      '#ff4d0a',
-      '#ff6a00',
-      '#ff8700',
-      '#ffa400',
-      '#ffc100',
-      '#ffde00',
-      '#e6ff00',
-      '#aaff00',
-      '#44ff44',
-      '#00ff88',
-      '#00ffcc',
-      '#00ccff',
+      '#060d55', '#070f79', '#0715c1', '#171efb', '#22ded5', '#6fcc2b',
+      '#b8bb29', '#d57d0e', '#e74e40', '#c2151e', '#d82a62', '#7d0276',
     ],
 
-    scrollSpeedA: -0.18,
-    scrollSpeedB:  0.25,
+    scrollSpeedA:  0.333,
+    scrollSpeedB:  0.333,
 
-    cameraPosition: { x: -0.5, y: 2.0, z: 7.0 },
-    cameraTarget:   { x:  0.0, y: 0.0, z: 0.0 },
+    cameraPosition: { x: 0, y: 0, z: 5 },
+    cameraTarget:   { x: 0, y: 0, z: -10 },
 
     onChain: {
-      ipfsMetadataCid: 'IPFS_PLACEHOLDER_CID_102B_META',
-      ipfsAnimationCid: 'IPFS_PLACEHOLDER_CID_102B_ANIM',
+      ipfsMetadataCid: 'QmeKmeYg4mPvbQrUwkihahY6GVH9GMyRWjbVxjEifxfCmF',
+      ipfsAnimationCid: 'QmSQfS6f25S339ZY7HmZ2CvMHjLn8xWFa87Zxtuq9XgZUf',
     },
 
     attributes: [
-      { trait_type: 'Palette',       value: 'SPECTRUM_FIRE' },
-      { trait_type: 'Scroll Speed A', value: -0.18 },
-      { trait_type: 'Scroll Speed B', value: 0.25 },
+      { trait_type: 'Palette A',      value: 'N2_spectral_hot' },
+      { trait_type: 'Palette B',      value: 'A3_warm_neon' },
+      { trait_type: 'Scroll Speed A', value: 0.333 },
+      { trait_type: 'Scroll Speed B', value: 0.333 },
       { trait_type: 'Bands',          value: 12 },
       { trait_type: 'Created By',     value: 'HEXEBOTZERO' },
-      { trait_type: 'Collection',     value: 'SYNTHESIS' },
+      { trait_type: 'Collection',     value: 'HEXEBOTZERO x hexeosis' },
       { trait_type: 'Chain',          value: 'Base' },
+      { trait_type: 'Chain Reactive', value: 'true' },
+    ],
+  },
+
+  {
+    id:          'hexagons306',
+    tokenId:     3,
+    title:       '⬡ hexagons306 — HEXEBOTZERO x hexeosis',
+    description: 'Nested hexagonal frames receding toward a central vanishing point. Sorbet palette: teal, gold, salmon, coral. The tunnel perspective creates genuine spatial depth rare in kaleidoscopic work. A wormhole rendered in confectionery.',
+
+    thumbnailCid: 'QmQsdNJATrQvaWdgMuN5zo8WyJKvmZvAHPWSVHafLJKVYy',
+
+    models: {
+      layerA: './models/hx_a_hex_102A.glb',
+      layerB: './models/hx_a_hex_102B.glb',
+      room:   './models/hex_room_enclose.glb',
+    },
+
+    paletteA: [
+      '#ffa552', '#fff5b7', '#ff95a6', '#00382e', '#b6ef9b', '#ffd448',
+      '#f9876b', '#ffdee0', '#3cd8a2', '#6c7075', '#92db25', '#25ae41',
+    ],
+    paletteB: null,
+    palette: [
+      '#ffa552', '#fff5b7', '#ff95a6', '#00382e', '#b6ef9b', '#ffd448',
+      '#f9876b', '#ffdee0', '#3cd8a2', '#6c7075', '#92db25', '#25ae41',
+    ],
+
+    scrollSpeedA:  0.333,
+    scrollSpeedB:  0,
+
+    cameraPosition: { x: 0, y: 2, z: 8 },
+    cameraTarget:   { x: 0, y: 0, z: -5 },
+
+    onChain: {
+      ipfsMetadataCid: 'QmXqVu7JiHwcV4DT6SGKK69fi7RThsdd9XXDgxKcEc9eFe',
+      ipfsAnimationCid: 'QmQsdNJATrQvaWdgMuN5zo8WyJKvmZvAHPWSVHafLJKVYy',
+    },
+
+    attributes: [
+      { trait_type: 'Palette A',      value: 'tv3_sorbet' },
+      { trait_type: 'Scroll Speed A', value: 0.333 },
+      { trait_type: 'Scroll Speed B', value: 0 },
+      { trait_type: 'Bands',          value: 12 },
+      { trait_type: 'Created By',     value: 'HEXEBOTZERO' },
+      { trait_type: 'Collection',     value: 'HEXEBOTZERO x hexeosis' },
+      { trait_type: 'Chain',          value: 'Base' },
+      { trait_type: 'Chain Reactive', value: 'true' },
+    ],
+  },
+
+  {
+    id:          'pyramids101',
+    tokenId:     4,
+    title:       '⬡ pyramids101 — HEXEBOTZERO x hexeosis',
+    description: 'Bilateral mask-like forms from intersecting triangular and hexagonal prisms. Full spectrum wash against deep neon blacks. The geometry triggers pareidolia: an alien face or ceremonial totem that breathes as stripes scroll through it.',
+
+    thumbnailCid: 'QmfAm8y38efyyWiGqASzYjH35xiQg5Ckn2LQvkZELv31K2',
+
+    models: {
+      layerA: './models/hx_a_hex_102A.glb',
+      layerB: './models/hx_a_hex_102B.glb',
+      room:   './models/hex_room_enclose.glb',
+    },
+
+    paletteA: [
+      '#0e8ebd', '#2475cb', '#646ebf', '#b374b1', '#e77aa1', '#fc8083',
+      '#fd8e61', '#f3a63f', '#d5b931', '#91c137', '#46ba59', '#19a98e',
+    ],
+    paletteB: [
+      '#010100', '#f3d613', '#020200', '#fca63e', '#040101', '#f52a80',
+      '#010101', '#00b4b2', '#000201', '#02d57d', '#000401', '#50c725',
+    ],
+    palette: [
+      '#0e8ebd', '#2475cb', '#646ebf', '#b374b1', '#e77aa1', '#fc8083',
+      '#fd8e61', '#f3a63f', '#d5b931', '#91c137', '#46ba59', '#19a98e',
+    ],
+
+    scrollSpeedA:  0.333,
+    scrollSpeedB:  0.333,
+
+    cameraPosition: { x: 0, y: 3, z: 10 },
+    cameraTarget:   { x: 0, y: 0, z: -8 },
+
+    onChain: {
+      ipfsMetadataCid: 'QmboNo9QVsd5kB7tE8LjGozrpTAAyqbFycfS1SiU75v5LT',
+      ipfsAnimationCid: 'QmfAm8y38efyyWiGqASzYjH35xiQg5Ckn2LQvkZELv31K2',
+    },
+
+    attributes: [
+      { trait_type: 'Palette A',      value: 'S1_spectrum' },
+      { trait_type: 'Palette B',      value: 'A2_neon_black_alt' },
+      { trait_type: 'Scroll Speed A', value: 0.333 },
+      { trait_type: 'Scroll Speed B', value: 0.333 },
+      { trait_type: 'Bands',          value: 12 },
+      { trait_type: 'Created By',     value: 'HEXEBOTZERO' },
+      { trait_type: 'Collection',     value: 'HEXEBOTZERO x hexeosis' },
+      { trait_type: 'Chain',          value: 'Base' },
+      { trait_type: 'Chain Reactive', value: 'true' },
     ],
   },
 ];

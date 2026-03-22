@@ -69,6 +69,9 @@ export class WalletManager {
     }
 
     try {
+      // Request account access first — must happen before any RPC calls
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+
       this.provider = new BrowserProvider(window.ethereum);
 
       // Check/switch network

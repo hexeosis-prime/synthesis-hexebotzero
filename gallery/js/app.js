@@ -14,6 +14,7 @@ import {
   NFT_CONTRACT_ADDRESS,
   AUCTION_CONTRACT_ADDRESS,
   AUCTION_ABI,
+  RPC_URL,
   IPFS_GATEWAY,
   LINKS,
 } from './config.js';

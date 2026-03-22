@@ -13,6 +13,7 @@
     "mint:full": "node src/mint.mjs full"
   },
   "dependencies": {
+    "ethers": "^6.16.0",
     "puppeteer": "^24.0.0",
     "sharp": "^0.34.0"
   }
