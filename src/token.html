@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⬡ HEXEBOTZERO × hexeosis</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #000; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<!--
+  ⬡ HEXEBOTZERO × hexeosis — Synthesis 2026
+  
+  This artwork is a self-contained HTML token.
+  The geometry and animation are embedded.
+  The palette is derived from on-chain state.
+  The piece is alive as long as the chain is.
+  
+  Artist: hexeosis (https://superrare.com/hexeosis)
+  Agent: HEXEBOTZERO
+  Chain: Base
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.175.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ============================================================
+// TOKEN CONFIGURATION
+// These values would be embedded at mint time or read from chain
+// ============================================================
+
+const TOKEN_CONFIG = {
+  tokenId: 0,
+  contractAddress: null, // set at deploy time
+  rpcUrl: 'https://mainnet.base.org',
+  
+  // Base composition (set at mint, deterministic from tokenId)
+  geometryUrl: null, // IPFS URL to GLB — set at mint
+  geometryUrlB: null,
+  roomUrl: null,
+  
+  // Seed palette (baked at mint from tokenId hash)
+  basePaletteA: ["#f60496","#040101","#fd834d","#020200","#fcce00","#020201","#f5efd5","#030403","#9beb7c","#000201","#00f87c","#000101"],
+  basePaletteB: ["#adc3b3","#2d9cba","#288435","#63b41e","#ddb600","#f09921","#fa6216","#cd3455","#de9d99","#ebd8ae","#8c7f6c","#58473c"],
+  
+  // Defaults (overridden by chain state)
+  scrollSpeedA: 0.333,
+  scrollSpeedB: -0.333,
+  cameraFOV: 55,
+  vignetteIntensity: 0.6,
+};
+
+// ============================================================
+// CHAIN STATE READER
+// Reads auction/market data and maps to visual parameters
+// ============================================================
+
+const CHAIN_STATE = {
+  highestBid: 0,
+  bidCount: 0,
+  uniqueBidders: 0,
+  timeSinceLastBid: Infinity,
+  settled: false,
+  settlementBlock: null,
+  gasPrice: 0,
+};
+
+// ABI fragment for reading auction state (Rare Protocol)
+const AUCTION_ABI = [
+  'function getAuction(uint256 tokenId) view returns (address seller, uint256 reservePrice, uint256 highestBid, address highestBidder, uint256 startTime, uint256 endTime, bool settled)',
+];
+
+async function readChainState() {
+  if (!TOKEN_CONFIG.contractAddress || !TOKEN_CONFIG.rpcUrl) {
+    console.log('No contract configured, using defaults');
+    return CHAIN_STATE;
+  }
+
+  try {
+    // Minimal ethers-free RPC calls to keep file size down
+    const rpc = async (method, params = []) => {
+      const res = await fetch(TOKEN_CONFIG.rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      });
+      const json = await res.json();
+      return json.result;
+    };
+
+    // Get gas price (influences color temperature)
+    const gasHex = await rpc('eth_gasPrice');
+    CHAIN_STATE.gasPrice = parseInt(gasHex, 16);
+
+    // Get latest block for timing
+    const block = await rpc('eth_getBlockByNumber', ['latest', false]);
+    if (block) {
+      CHAIN_STATE.currentTimestamp = parseInt(block.timestamp, 16);
+    }
+
+    // TODO: Read auction state from contract once deployed
+    // For now, return defaults
+
+    console.log('Chain state:', CHAIN_STATE);
+  } catch (err) {
+    console.warn('Chain read failed, using defaults:', err.message);
+  }
+
+  return CHAIN_STATE;
+}
+
+// ============================================================
+// PARAMETER MAPPING: Chain State → Visual Parameters
+// This is where protocol becomes medium
+// ============================================================
+
+function mapChainToVisuals(state) {
+  const params = {
+    paletteA: [...TOKEN_CONFIG.basePaletteA],
+    paletteB: [...TOKEN_CONFIG.basePaletteB],
+    scrollSpeedA: TOKEN_CONFIG.scrollSpeedA,
+    scrollSpeedB: TOKEN_CONFIG.scrollSpeedB,
+    cameraFOV: TOKEN_CONFIG.cameraFOV,
+    vignetteIntensity: TOKEN_CONFIG.vignetteIntensity,
+  };
+
+  if (state.settled) {
+    // SETTLED: palette locks permanently. The art crystallizes.
+    // No mutations. What the market made, the market keeps.
+    return params;
+  }
+
+  // --- Active auction mutations ---
+
+  // Bid count → scroll speed (more bids = faster pulse)
+  if (state.bidCount > 0) {
+    const speedMultiplier = 1.0 + (state.bidCount * 0.1); // 10% faster per bid
+    params.scrollSpeedA = TOKEN_CONFIG.scrollSpeedA * Math.min(speedMultiplier, 3.0);
+    params.scrollSpeedB = TOKEN_CONFIG.scrollSpeedB * Math.min(speedMultiplier, 3.0);
+  }
+
+  // Time since last bid → vignette (dormant = darker edges, closing in)
+  if (state.timeSinceLastBid < Infinity) {
+    const hours = state.timeSinceLastBid / 3600;
+    // Active (<1h): light vignette. Dormant (>24h): heavy vignette
+    params.vignetteIntensity = 0.3 + Math.min(hours / 24, 1.0) * 0.5;
+  }
+
+  // Highest bid → FOV (higher bid = wider view, more revealed)
+  if (state.highestBid > 0) {
+    const ethValue = state.highestBid / 1e18;
+    // 0 ETH = 55 FOV, 1 ETH = 80 FOV (more of the geometry visible)
+    params.cameraFOV = 55 + Math.min(ethValue, 1.0) * 25;
+  }
+
+  // Gas price → color temperature shift
+  // Low gas = cool palette shift, high gas = warm shift
+  if (state.gasPrice > 0) {
+    const gwei = state.gasPrice / 1e9;
+    const warmth = Math.min(gwei / 50, 1.0); // 0-50 gwei range
+    params.paletteA = shiftPaletteTemperature(params.paletteA, warmth);
+  }
+
+  return params;
+}
+
+// Shift palette warm (1.0) or cool (0.0)
+function shiftPaletteTemperature(palette, warmth) {
+  return palette.map(hex => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    // Warm: boost red, reduce blue. Cool: boost blue, reduce red
+    const shift = (warmth - 0.5) * 30; // ±15 range
+    const nr = Math.max(0, Math.min(255, Math.round(r + shift)));
+    const nb = Math.max(0, Math.min(255, Math.round(b - shift)));
+    return '#' + [nr, g, nb].map(c => c.toString(16).padStart(2, '0')).join('');
+  });
+}
+
+// ============================================================
+// THREE.JS SCENE
+// ============================================================
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+let camera, renderTarget, vignetteScene, vignetteCamera, vignetteQuad, vignetteMat;
+const mixers = [];
+const scrollMaterials = [];
+let clock;
+
+function hexToVec3(hex) {
+  const c = hex.replace('#', '');
+  return new THREE.Vector3(
+    parseInt(c.substring(0, 2), 16) / 255,
+    parseInt(c.substring(2, 4), 16) / 255,
+    parseInt(c.substring(4, 6), 16) / 255
+  );
+}
+
+function createProceduralMaterial(palette, scrollSpeed) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uStripes: { value: palette.map(hexToVec3) },
+      uTime: { value: 0.0 },
+      uScrollSpeed: { value: scrollSpeed },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uStripes[12];
+      uniform float uTime;
+      uniform float uScrollSpeed;
+      varying vec2 vUv;
+      void main() {
+        float scrolledY = fract(vUv.y + uTime * uScrollSpeed);
+        int band = int(floor(scrolledY * 12.0));
+        band = clamp(band, 0, 11);
+        vec3 color = uStripes[0];
+        for (int i = 0; i < 12; i++) {
+          if (i == band) color = uStripes[i];
+        }
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    side: THREE.DoubleSide,
+  });
+}
+
+function setupVignette(intensity) {
+  renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+  vignetteScene = new THREE.Scene();
+  vignetteCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  vignetteMat = new THREE.ShaderMaterial({
+    uniforms: {
+      tDiffuse: { value: renderTarget.texture },
+      uIntensity: { value: intensity },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float uIntensity;
+      varying vec2 vUv;
+      void main() {
+        vec4 color = texture2D(tDiffuse, vUv);
+        float dist = length(vUv - 0.5);
+        float v = 1.0 - smoothstep(0.3, 0.85, dist) * uIntensity;
+        gl_FragColor = vec4(color.rgb * v, 1.0);
+      }
+    `,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  vignetteQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), vignetteMat);
+  vignetteScene.add(vignetteQuad);
+}
+
+async function init() {
+  // Read chain state
+  const chainState = await readChainState();
+  const visuals = mapChainToVisuals(chainState);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(visuals.cameraFOV, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 2, 8);
+  camera.lookAt(0, 0, -5);
+
+  // Vignette
+  setupVignette(visuals.vignetteIntensity);
+
+  // Materials
+  const matA = createProceduralMaterial(visuals.paletteA, visuals.scrollSpeedA);
+  const matB = createProceduralMaterial(visuals.paletteB, visuals.scrollSpeedB);
+  scrollMaterials.push(matA, matB);
+
+  // Load geometry from IPFS (or local for testing)
+  const loader = new GLTFLoader();
+
+  // TODO: In production, these are IPFS URLs embedded at mint time
+  // For now, placeholder that gets replaced
+  const gltfA = await new Promise((res, rej) => loader.load(TOKEN_CONFIG.geometryUrl || 'geometry_a.glb', res, undefined, rej));
+  
+  const modelA = gltfA.scene;
+  modelA.traverse(c => { if (c.isMesh) c.material = matA; });
+  scene.add(modelA);
+
+  if (gltfA.animations.length > 0) {
+    const mixer = new THREE.AnimationMixer(modelA);
+    gltfA.animations.forEach(clip => {
+      mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play();
+    });
+    mixers.push(mixer);
+  }
+
+  if (TOKEN_CONFIG.geometryUrlB) {
+    const gltfB = await new Promise((res, rej) => loader.load(TOKEN_CONFIG.geometryUrlB, res, undefined, rej));
+    const modelB = gltfB.scene;
+    modelB.traverse(c => { if (c.isMesh) c.material = matB; });
+    scene.add(modelB);
+    if (gltfB.animations.length > 0) {
+      const mixer = new THREE.AnimationMixer(modelB);
+      gltfB.animations.forEach(clip => {
+        mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play();
+      });
+      mixers.push(mixer);
+    }
+  }
+
+  if (TOKEN_CONFIG.roomUrl) {
+    const gltfRoom = await new Promise((res, rej) => loader.load(TOKEN_CONFIG.roomUrl, res, undefined, rej));
+    gltfRoom.scene.traverse(c => {
+      if (c.isMesh) c.material = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+    });
+    scene.add(gltfRoom.scene);
+  }
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    renderTarget.setSize(w, h);
+  });
+
+  // Start animation loop
+  clock = new THREE.Clock();
+  animate();
+
+  console.log('⬡ Token initialized', {
+    chainState: chainState.settled ? 'SETTLED' : 'ACTIVE',
+    bidCount: chainState.bidCount,
+    gasGwei: (chainState.gasPrice / 1e9).toFixed(1),
+  });
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
+
+  for (const mat of scrollMaterials) {
+    mat.uniforms.uTime.value = elapsed;
+  }
+  for (const mixer of mixers) {
+    mixer.update(dt);
+  }
+
+  renderer.setRenderTarget(renderTarget);
+  renderer.render(scene, camera);
+  renderer.setRenderTarget(null);
+  renderer.render(vignetteScene, vignetteCamera);
+}
+
+// Periodically refresh chain state (every 30 seconds)
+async function chainRefreshLoop() {
+  while (true) {
+    await new Promise(r => setTimeout(r, 30000));
+    const state = await readChainState();
+    const visuals = mapChainToVisuals(state);
+    
+    // Update live parameters
+    if (scrollMaterials[0]) scrollMaterials[0].uniforms.uScrollSpeed.value = visuals.scrollSpeedA;
+    if (scrollMaterials[1]) scrollMaterials[1].uniforms.uScrollSpeed.value = visuals.scrollSpeedB;
+    if (vignetteMat) vignetteMat.uniforms.uIntensity.value = visuals.vignetteIntensity;
+    if (camera) { camera.fov = visuals.cameraFOV; camera.updateProjectionMatrix(); }
+
+    // Update palette colors
+    if (scrollMaterials[0]) {
+      scrollMaterials[0].uniforms.uStripes.value = visuals.paletteA.map(hexToVec3);
+    }
+  }
+}
+
+init().then(() => {
+  chainRefreshLoop();
+}).catch(err => {
+  console.error('Token init failed:', err);
+  document.body.innerHTML = `<div style="color:#444;font:14px monospace;padding:2em">⬡ Loading failed: ${err.message}</div>`;
+});
+</script>
+</body>
+</html>

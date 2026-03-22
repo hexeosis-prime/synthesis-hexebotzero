@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.175.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const WIDTH = window.__RENDER_WIDTH || 1024;
+const HEIGHT = window.__RENDER_HEIGHT || 1024;
+const TOTAL_FRAMES = window.__TOTAL_FRAMES || 120;
+const FPS = window.__FPS || 30;
+
+// Config injected by render.mjs or self-contained token
+const CONFIG = window.__SCENE_CONFIG || {
+  assetBase: '/Users/hexebotzero/hexeosis_asset_kit',
+  layerA: 'hx_models/animated/hx_a_hex_102A.glb',
+  layerB: 'hx_models/animated/hx_a_hex_102B.glb',
+  room: 'hx_models/static/hex_room_enclose.glb',
+  // Procedural palette mode (no texture files needed)
+  paletteA: ["#f60496","#040101","#fd834d","#020200","#fcce00","#020201","#f5efd5","#030403","#9beb7c","#000201","#00f87c","#000101"],
+  paletteB: ["#adc3b3","#2d9cba","#288435","#63b41e","#ddb600","#f09921","#fa6216","#cd3455","#de9d99","#ebd8ae","#8c7f6c","#58473c"],
+  // Fallback to texture files if no palette
+  textureA: null,
+  textureB: null,
+  scrollSpeedA: null,  // null = auto-sync to animation duration
+  scrollSpeedB: null,
+  scrollDirectionB: -1, // -1 = reverse, 1 = same
+  cameraPos: [0, 2, 8],
+  cameraLookAt: [0, 0, -5],
+  cameraFOV: 55,
+  bgColor: 0x000000,
+  vignette: true,
+  vignetteIntensity: 0.6,
+};
+
+// --- Renderer ---
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  preserveDrawingBuffer: true,
+  alpha: false,
+});
+renderer.setSize(WIDTH, HEIGHT);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(CONFIG.bgColor);
+
+const camera = new THREE.PerspectiveCamera(CONFIG.cameraFOV, WIDTH / HEIGHT, 0.1, 200);
+camera.position.set(...CONFIG.cameraPos);
+camera.lookAt(new THREE.Vector3(...CONFIG.cameraLookAt));
+
+// --- Utility: hex color to vec3 ---
+function hexToVec3(hex) {
+  const c = hex.replace('#', '');
+  return new THREE.Vector3(
+    parseInt(c.substring(0, 2), 16) / 255,
+    parseInt(c.substring(2, 4), 16) / 255,
+    parseInt(c.substring(4, 6), 16) / 255
+  );
+}
+
+// --- Procedural Stripe Shader ---
+// Pure GLSL: 12 bands of solid color, no texture needed
+// Scrolls UV.y over time, synced to animation cycle
+
+const SCROLL_VERT = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const SCROLL_FRAG_PROCEDURAL = `
+  uniform vec3 uStripes[12];
+  uniform float uTime;
+  uniform float uScrollSpeed;
+  varying vec2 vUv;
+
+  void main() {
+    float scrolledY = fract(vUv.y + uTime * uScrollSpeed);
+    int band = int(floor(scrolledY * 12.0));
+    // Clamp to valid range (GLSL int precision safety)
+    band = clamp(band, 0, 11);
+    vec3 color = uStripes[0];
+    for (int i = 0; i < 12; i++) {
+      if (i == band) color = uStripes[i];
+    }
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+// Texture-based fallback (for backward compat)
+const SCROLL_FRAG_TEXTURE = `
+  uniform sampler2D uTexture;
+  uniform float uTime;
+  uniform float uScrollSpeed;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 scrolledUV = vec2(vUv.x, fract(vUv.y + uTime * uScrollSpeed));
+    gl_FragColor = texture2D(uTexture, scrolledUV);
+  }
+`;
+
+function createProceduralMaterial(palette, scrollSpeed) {
+  const stripeColors = palette.map(hexToVec3);
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uStripes: { value: stripeColors },
+      uTime: { value: 0.0 },
+      uScrollSpeed: { value: scrollSpeed },
+    },
+    vertexShader: SCROLL_VERT,
+    fragmentShader: SCROLL_FRAG_PROCEDURAL,
+    side: THREE.DoubleSide,
+  });
+}
+
+function createTextureMaterial(texture, scrollSpeed) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTexture: { value: texture },
+      uTime: { value: 0.0 },
+      uScrollSpeed: { value: scrollSpeed },
+    },
+    vertexShader: SCROLL_VERT,
+    fragmentShader: SCROLL_FRAG_TEXTURE,
+    side: THREE.DoubleSide,
+  });
+}
+
+// --- Vignette Post-Processing ---
+let vignettePass = null;
+let vignetteScene, vignetteCamera, vignetteQuad;
+let renderTarget;
+
+if (CONFIG.vignette) {
+  renderTarget = new THREE.WebGLRenderTarget(WIDTH, HEIGHT, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+  });
+
+  vignetteScene = new THREE.Scene();
+  vignetteCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  const vignetteMat = new THREE.ShaderMaterial({
+    uniforms: {
+      tDiffuse: { value: renderTarget.texture },
+      uIntensity: { value: CONFIG.vignetteIntensity },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float uIntensity;
+      varying vec2 vUv;
+      void main() {
+        vec4 color = texture2D(tDiffuse, vUv);
+        vec2 center = vUv - 0.5;
+        float dist = length(center);
+        float vignette = 1.0 - smoothstep(0.3, 0.85, dist) * uIntensity;
+        gl_FragColor = vec4(color.rgb * vignette, 1.0);
+      }
+    `,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  vignetteQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), vignetteMat);
+  vignetteScene.add(vignetteQuad);
+  vignettePass = true;
+}
+
+// --- Asset Loading ---
+const loader = new GLTFLoader();
+const textureLoader = new THREE.TextureLoader();
+const mixers = [];
+const scrollMaterials = [];
+let animationDuration = 3.0; // default, overridden by actual GLB data
+
+function loadGLB(path) {
+  return new Promise((resolve, reject) => {
+    loader.load('file://' + path, resolve, undefined, reject);
+  });
+}
+
+function loadTexture(path) {
+  return new Promise((resolve, reject) => {
+    const tex = textureLoader.load('file://' + path, () => resolve(tex), undefined, reject);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+  });
+}
+
+async function initScene() {
+  const base = CONFIG.assetBase;
+
+  // --- Load GLBs ---
+  const loadPromises = [loadGLB(`${base}/${CONFIG.layerA}`)];
+  if (CONFIG.layerB) loadPromises.push(loadGLB(`${base}/${CONFIG.layerB}`));
+  if (CONFIG.room) loadPromises.push(loadGLB(`${base}/${CONFIG.room}`));
+
+  const results = await Promise.all(loadPromises);
+  const gltfA = results[0];
+  const gltfB = CONFIG.layerB ? results[1] : null;
+  const gltfRoom = CONFIG.room ? results[CONFIG.layerB ? 2 : 1] : null;
+
+  // --- Detect animation duration ---
+  if (gltfA.animations && gltfA.animations.length > 0) {
+    animationDuration = gltfA.animations[0].duration;
+    console.log('Animation duration:', animationDuration, 'seconds');
+  }
+
+  // --- Calculate scroll speeds ---
+  // Default: exactly 1 full UV cycle per animation loop = seamless
+  const baseScrollSpeed = 1.0 / animationDuration;
+  const speedA = CONFIG.scrollSpeedA !== null ? CONFIG.scrollSpeedA : baseScrollSpeed;
+  const speedB = CONFIG.scrollSpeedB !== null ? CONFIG.scrollSpeedB : (baseScrollSpeed * (CONFIG.scrollDirectionB || 1));
+
+  // --- Create materials ---
+  let matA, matB;
+
+  if (CONFIG.paletteA) {
+    // Procedural mode: colors defined as hex arrays
+    matA = createProceduralMaterial(CONFIG.paletteA, speedA);
+  } else if (CONFIG.textureA) {
+    const texA = await loadTexture(`${base}/${CONFIG.textureA}`);
+    matA = createTextureMaterial(texA, speedA);
+  }
+
+  if (CONFIG.layerB) {
+    if (CONFIG.paletteB) {
+      matB = createProceduralMaterial(CONFIG.paletteB, speedB);
+    } else if (CONFIG.textureB) {
+      const texB = await loadTexture(`${base}/${CONFIG.textureB}`);
+      matB = createTextureMaterial(texB, speedB);
+    }
+  }
+
+  scrollMaterials.push(matA);
+  if (matB) scrollMaterials.push(matB);
+
+  // --- Apply materials and add to scene ---
+  const modelA = gltfA.scene;
+  modelA.traverse((child) => {
+    if (child.isMesh) child.material = matA;
+  });
+  scene.add(modelA);
+
+  if (gltfA.animations.length > 0) {
+    const mixerA = new THREE.AnimationMixer(modelA);
+    gltfA.animations.forEach((clip) => {
+      const action = mixerA.clipAction(clip);
+      action.setLoop(THREE.LoopRepeat);
+      action.play();
+    });
+    mixers.push(mixerA);
+  }
+
+  if (gltfB) {
+    const modelB = gltfB.scene;
+    modelB.traverse((child) => {
+      if (child.isMesh) child.material = matB;
+    });
+    scene.add(modelB);
+
+    if (gltfB.animations.length > 0) {
+      const mixerB = new THREE.AnimationMixer(modelB);
+      gltfB.animations.forEach((clip) => {
+        const action = mixerB.clipAction(clip);
+        action.setLoop(THREE.LoopRepeat);
+        action.play();
+      });
+      mixers.push(mixerB);
+    }
+  }
+
+  // --- Hex room (black walls, viewed from inside) ---
+  if (gltfRoom) {
+    const room = gltfRoom.scene;
+    room.traverse((child) => {
+      if (child.isMesh) {
+        child.material = new THREE.MeshBasicMaterial({
+          color: 0x000000,
+          side: THREE.BackSide,
+        });
+      }
+    });
+    scene.add(room);
+  }
+
+  console.log('Scene initialized:', {
+    layerA: CONFIG.layerA,
+    layerB: CONFIG.layerB,
+    mode: CONFIG.paletteA ? 'procedural' : 'texture',
+    animDuration: animationDuration,
+    scrollSpeedA: speedA.toFixed(4),
+    scrollSpeedB: speedB.toFixed(4),
+  });
+}
+
+// --- Frame Rendering ---
+let lastElapsed = 0;
+function renderFrame(frameIndex) {
+  const dt = 1.0 / FPS;
+  const elapsed = frameIndex * dt;
+
+  // Update scroll time (absolute, for perfect loop sync)
+  for (const mat of scrollMaterials) {
+    mat.uniforms.uTime.value = elapsed;
+  }
+
+  // Update animation mixers (absolute time via delta from last frame)
+  // On first frame, advance by 0 to stay at time=0
+  const mixerDelta = frameIndex === 0 ? 0 : (elapsed - lastElapsed);
+  for (const mixer of mixers) {
+    mixer.update(mixerDelta);
+  }
+  lastElapsed = elapsed;
+
+  // Render with optional vignette
+  if (vignettePass) {
+    renderer.setRenderTarget(renderTarget);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    renderer.render(vignetteScene, vignetteCamera);
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+
+// Expose to puppeteer / token viewer
+window.__renderFrame = renderFrame;
+window.__animationDuration = () => animationDuration;
+
+initScene().then(() => {
+  renderFrame(0);
+  window.__ready = true;
+  console.log('⬡ Scene ready');
+}).catch(err => {
+  console.error('Scene init failed:', err);
+  window.__ready = true;
+  window.__initError = err.message;
+});
+</script>
+</body>
+</html>

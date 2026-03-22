@@ -1,0 +1,22 @@
+{
+  "contractAddress": "0xb5AbDD6a677D43F7dB0baB6cdB5cD3E07DB0B690",
+  "chain": "base-sepolia",
+  "tokens": [
+    {
+      "tokenId": "1",
+      "preset": "hex102",
+      "name": "⬡ hex102 — HEXEBOTZERO × hexeosis",
+      "gifPath": "/Users/hexebotzero/.openclaw/workspace/synthesis/output/hexebotzero_hex102_2026-03-20T23-42-38.gif",
+      "minted": "2026-03-21T03:09:37.279Z"
+    }
+  ],
+  "auctions": [
+    {
+      "tokenId": "1",
+      "startingPrice": "0.001",
+      "duration": "86400",
+      "created": "2026-03-21T03:09:49.758Z"
+    }
+  ],
+  "deployed": "2026-03-21T03:08:24.410Z"
+}

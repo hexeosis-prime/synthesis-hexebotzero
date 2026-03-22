@@ -1,0 +1,19 @@
+{
+  "description": "Extracted hexeosis stripe palettes — 12 bands each, sampled from center column of 2k textures",
+  "format": "hex RGB, top-to-bottom band order",
+  "palettes": {
+    "A1_neon_black": ["#f60496", "#040101", "#fd834d", "#020200", "#fcce00", "#020201", "#f5efd5", "#030403", "#9beb7c", "#000201", "#00f87c", "#000101"],
+    "A2_neon_black_alt": ["#010100", "#f3d613", "#020200", "#fca63e", "#040101", "#f52a80", "#010101", "#00b4b2", "#000201", "#02d57d", "#000401", "#50c725"],
+    "A3_warm_neon": ["#fed7a0", "#040101", "#ffbf7c", "#020200", "#ffd548", "#020201", "#93dc26", "#030403", "#21b64f", "#000201", "#25ad41", "#000101"],
+    "K1_earthy": ["#adc3b3", "#2d9cba", "#288435", "#63b41e", "#ddb600", "#f09921", "#fa6216", "#cd3455", "#de9d99", "#ebd8ae", "#8c7f6c", "#58473c"],
+    "K2_jewel": ["#627ed7", "#df71ad", "#e9ce00", "#f4530e", "#0137a5", "#d2a786", "#e8b409", "#b7b07a", "#b7b697", "#7549c1", "#00ae67", "#7c84cb"],
+    "K3_soft_industrial": ["#5a87bc", "#306e88", "#6f7572", "#ebb236", "#d0f925", "#9ebccc", "#b2a99e", "#fb6756", "#dcdcdc", "#f58ed6", "#daf208", "#dbd6ce"],
+    "S1_spectrum": ["#0e8ebd", "#2475cb", "#646ebf", "#b374b1", "#e77aa1", "#fc8083", "#fd8e61", "#f3a63f", "#d5b931", "#91c137", "#46ba59", "#19a98e"],
+    "tv1_candy": ["#45c183", "#ffe066", "#ff5c57", "#34d1bf", "#4b4f47", "#ffd19c", "#78e2dc", "#a5e72b", "#f9b1ff", "#ffeacf", "#ff8c42", "#d33682"],
+    "tv2_tropical": ["#a0168f", "#ff5f05", "#ffd500", "#ffeacf", "#61e20d", "#ffd19c", "#3bdaa3", "#004ea6", "#00a885", "#02ef34", "#746a5e", "#fea900"],
+    "tv3_sorbet": ["#ffa552", "#fff5b7", "#ff95a6", "#00382e", "#b6ef9b", "#ffd448", "#f9876b", "#ffdee0", "#3cd8a2", "#6c7075", "#92db25", "#25ae41"],
+    "N1_deep_neon": ["#000202", "#024341", "#739e03", "#8e85f5", "#6d1bb7", "#d41f94", "#eb6130", "#fca8a7", "#fc6668", "#a999fc", "#8ec026", "#4b49f7"],
+    "N2_spectral_hot": ["#060d55", "#070f79", "#0715c1", "#171efb", "#22ded5", "#6fcc2b", "#b8bb29", "#d57d0e", "#e74e40", "#c2151e", "#d82a62", "#7d0276"],
+    "N3_aurora": ["#4cdbec", "#a5b936", "#a79df6", "#ad43e5", "#ad2c6f", "#4b0e18", "#ed4641", "#1a0c03", "#250a1e", "#07053d", "#090b7e", "#0009bd"]
+  }
+}

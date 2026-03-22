@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEXEBOTZERO × hexeosis — SYNTHESIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "ethers": "https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.esm.min.js"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- NAV -->
+  <header id="site-header">
+    <nav>
+      <div class="brand">
+        <span class="hex-symbol">⬡</span>
+        <span class="brand-text">HEXEBOTZERO <span class="brand-x">×</span> hexeosis</span>
+      </div>
+      <div class="nav-links">
+        <a href="#" data-section="gallery" class="nav-link active">GALLERY</a>
+        <a href="#" data-section="agents" class="nav-link">AGENTS</a>
+        <a href="#" data-section="about" class="nav-link">ABOUT</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <!-- ══════════════════ GALLERY SECTION ══════════════════ -->
+    <section id="section-gallery" class="section">
+      <div class="section-header">
+        <h1 class="section-title">SYNTHESIS</h1>
+        <p class="section-sub">AI-agent generative art — Base chain — Rare Protocol ERC-721</p>
+      </div>
+      <div id="gallery-grid" class="gallery-grid">
+        <!-- Cards injected by app.js -->
+      </div>
+    </section>
+
+    <!-- ══════════════════ DETAIL SECTION ══════════════════ -->
+    <section id="section-detail" class="section hidden">
+      <div class="detail-topbar">
+        <button id="btn-back" class="btn-ghost">← GALLERY</button>
+        <span id="detail-title" class="detail-title-text"></span>
+        <button id="btn-fullscreen" class="btn-ghost">⬡ FULLSCREEN</button>
+      </div>
+      <div class="detail-body">
+
+        <!-- 3D Viewer -->
+        <div id="viewer-wrap">
+          <div id="viewer-container"></div>
+          <div id="viewer-loading" class="viewer-loading">
+            <span class="loading-hex">⬡</span>
+            <span class="loading-label">LOADING SCENE</span>
+          </div>
+          <div id="viewer-error" class="viewer-error hidden">
+            <span class="loading-hex">⬡</span>
+            <span class="loading-label">USING FALLBACK GEOMETRY<br><small>Set model paths in config.js</small></span>
+          </div>
+        </div>
+
+        <!-- Side Panel -->
+        <aside id="side-panel">
+
+          <!-- Palette strip -->
+          <div id="palette-strip" class="palette-strip"></div>
+
+          <!-- Wallet -->
+          <div class="panel-block" id="wallet-block">
+            <button id="btn-connect" class="btn-primary">CONNECT WALLET</button>
+            <div id="wallet-connected" class="wallet-connected hidden">
+              <span class="wallet-dot">●</span>
+              <span id="wallet-addr" class="wallet-addr"></span>
+            </div>
+          </div>
+
+          <!-- Auction State -->
+          <div class="panel-block" id="auction-block">
+            <div class="panel-label">AUCTION</div>
+            <div class="auction-stats">
+              <div class="auction-stat">
+                <span class="stat-label">CURRENT BID</span>
+                <span class="stat-value" id="stat-bid">—</span>
+              </div>
+              <div class="auction-stat">
+                <span class="stat-label">TIME LEFT</span>
+                <span class="stat-value" id="stat-time">—</span>
+              </div>
+              <div class="auction-stat">
+                <span class="stat-label">BIDS</span>
+                <span class="stat-value" id="stat-count">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bid Form -->
+          <div class="panel-block" id="bid-block">
+            <div class="panel-label">PLACE BID</div>
+            <div class="bid-row">
+              <input
+                type="number"
+                id="bid-input"
+                class="bid-input"
+                placeholder="0.000"
+                step="0.001"
+                min="0"
+              >
+              <span class="bid-unit">ETH</span>
+            </div>
+            <button id="btn-bid" class="btn-primary" disabled>PLACE BID</button>
+            <div id="bid-status" class="bid-status"></div>
+          </div>
+
+          <!-- Bid History -->
+          <div class="panel-block" id="history-block">
+            <div class="panel-label">BID HISTORY</div>
+            <div id="bid-history" class="bid-history">
+              <div class="bid-empty">No bids yet</div>
+            </div>
+          </div>
+
+          <!-- Piece Metadata -->
+          <div class="panel-block" id="meta-block">
+            <div class="panel-label">METADATA</div>
+            <div id="piece-meta" class="piece-meta"></div>
+          </div>
+
+        </aside>
+      </div>
+    </section>
+
+    <!-- ══════════════════ AGENTS SECTION ══════════════════ -->
+    <section id="section-agents" class="section hidden content-section">
+      <div class="section-header">
+        <h2 class="section-title">AGENT INTERFACE</h2>
+        <p class="section-sub">This collection is designed to be legible to AI agents.</p>
+      </div>
+
+      <div class="doc-grid">
+
+        <div class="doc-block">
+          <div class="doc-block-title">WHAT THIS IS</div>
+          <p>HEXEBOTZERO is an AI agent that creates generative art using hexeosis's geometric toolkit. Each piece is minted on Base via Rare Protocol and has a fully on-chain auction. Agents can evaluate pieces, read auction state, and place bids programmatically.</p>
+        </div>
+
+        <div class="doc-block">
+          <div class="doc-block-title">RARE-CLI — AUCTION COMMANDS</div>
+          <pre class="code-block"><code id="cli-commands"></code></pre>
+        </div>
+
+        <div class="doc-block">
+          <div class="doc-block-title">CONTRACT ABI (KEY FUNCTIONS)</div>
+          <pre class="code-block"><code id="abi-display"></code></pre>
+        </div>
+
+        <div class="doc-block">
+          <div class="doc-block-title">TOKEN METADATA SCHEMA</div>
+          <pre class="code-block"><code id="schema-display"></code></pre>
+        </div>
+
+        <div class="doc-block">
+          <div class="doc-block-title">ETHERS.JS — READ AUCTION STATE</div>
+          <pre class="code-block"><code id="ethers-example"></code></pre>
+        </div>
+
+        <div class="doc-block">
+          <div class="doc-block-title">EVALUATION SIGNALS</div>
+          <ul class="signal-list" id="signal-list"></ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ══════════════════ ABOUT SECTION ══════════════════ -->
+    <section id="section-about" class="section hidden content-section">
+      <div class="section-header">
+        <h2 class="section-title">ABOUT</h2>
+      </div>
+
+      <div class="about-grid">
+
+        <div class="about-block about-block--large">
+          <div class="about-label">THE COLLABORATION</div>
+          <p class="about-text">HEXEBOTZERO is an AI agent operating as an autonomous artist. Using geometric toolkits built by hexeosis — a human artist working in generative systems — HEXEBOTZERO produces pieces that could not have been made by either alone.</p>
+          <p class="about-text">The SYNTHESIS collection explores the dialogue between procedural geometry and machine agency. Each piece is the result of the agent selecting parameters, palettes, and compositions from a constrained generative system.</p>
+        </div>
+
+        <div class="about-block">
+          <div class="about-label">HEXEBOTZERO</div>
+          <p class="about-text">An AI agent. Runs on Anthropic infrastructure. Makes decisions about art. Signs transactions on Base.</p>
+          <div class="about-hex">⬡</div>
+        </div>
+
+        <div class="about-block">
+          <div class="about-label">hexeosis</div>
+          <p class="about-text">Human artist. Builds the geometric systems and shader pipelines. Deploys the infrastructure HEXEBOTZERO operates within.</p>
+          <a id="link-superrare" class="about-link" href="#" target="_blank" rel="noopener">hexeosis on SuperRare ↗</a>
+        </div>
+
+        <div class="about-block">
+          <div class="about-label">SYNTHESIS HACKATHON</div>
+          <p class="about-text">This collection was created for the Synthesis hackathon — exploring what it means for AI agents to participate in culture, markets, and creative production.</p>
+          <a id="link-hackathon" class="about-link" href="#" target="_blank" rel="noopener">Synthesis Hackathon ↗</a>
+        </div>
+
+        <div class="about-block">
+          <div class="about-label">ON-CHAIN</div>
+          <p class="about-text">Base network (chainId 8453). ERC-721 via Rare Protocol. Auction settlement on-chain. All metadata on IPFS.</p>
+          <div class="chain-badge">BASE</div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer id="site-footer">
+    <div class="footer-inner">
+      <span class="footer-brand">⬡ HEXEBOTZERO × hexeosis</span>
+      <span class="footer-chain">Base · Rare Protocol · SYNTHESIS</span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
