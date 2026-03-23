@@ -74,6 +74,7 @@ export class Viewer {
     this.clock         = new THREE.Clock();
     this.animationId   = null;
     this.activeMats    = [];
+    this.mixers        = [];
     this.sceneGroup    = null;
 
     // Vignette post-process
@@ -233,15 +234,27 @@ export class Viewer {
       this.sceneGroup = null;
     }
     this.activeMats = [];
+    this.mixers = [];
   }
 
-  // ── Load a GLB; resolve with its scene or null on failure ────
+  // ── Set up animations from a loaded GLTF ─────────────────────
+  _setupAnimations(gltf) {
+    if (gltf.animations && gltf.animations.length > 0) {
+      const mixer = new THREE.AnimationMixer(gltf.scene);
+      gltf.animations.forEach(clip => {
+        mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play();
+      });
+      this.mixers.push(mixer);
+    }
+  }
+
+  // ── Load a GLB; resolve with full gltf or null on failure ────
   _loadGLB(url) {
     return new Promise(resolve => {
       const loader = new GLTFLoader();
       loader.load(
         url,
-        gltf => resolve(gltf.scene),
+        gltf => resolve(gltf),
         undefined,
         err  => { console.warn('[viewer] GLB load failed:', url, err); resolve(null); }
       );
@@ -258,37 +271,41 @@ export class Viewer {
     this.scene.add(group);
 
     // Build stripe materials
-    const matA = this._createStripeMat(piece.palette, piece.scrollSpeedA ?? 0.2);
-    const matB = this._createStripeMat(piece.palette, piece.scrollSpeedB ?? -0.15);
+    const palA = piece.paletteA || piece.palette;
+    const palB = piece.paletteB || piece.palette;
+    const matA = this._createStripeMat(palA, piece.scrollSpeedA ?? 0.2);
+    const matB = this._createStripeMat(palB, piece.scrollSpeedB ?? -0.15);
     this.activeMats.push(matA, matB);
 
     let usedFallback = false;
 
     if (piece.models) {
-      const [objA, objB, objRoom] = await Promise.all([
+      const [gltfA, gltfB, gltfRoom] = await Promise.all([
         piece.models.layerA ? this._loadGLB(piece.models.layerA) : Promise.resolve(null),
         piece.models.layerB ? this._loadGLB(piece.models.layerB) : Promise.resolve(null),
         piece.models.room   ? this._loadGLB(piece.models.room)   : Promise.resolve(null),
       ]);
 
-      if (objA) {
-        this._applyMat(objA, matA);
-        group.add(objA);
+      if (gltfA) {
+        this._applyMat(gltfA.scene, matA);
+        group.add(gltfA.scene);
+        this._setupAnimations(gltfA);
       }
-      if (objB) {
-        this._applyMat(objB, matB);
-        group.add(objB);
+      if (gltfB) {
+        this._applyMat(gltfB.scene, matB);
+        group.add(gltfB.scene);
+        this._setupAnimations(gltfB);
       }
-      if (objRoom) {
+      if (gltfRoom) {
         const roomMat = new THREE.MeshBasicMaterial({
           color: 0x000000,
           side:  THREE.BackSide,
         });
-        this._applyMat(objRoom, roomMat);
-        group.add(objRoom);
+        this._applyMat(gltfRoom.scene, roomMat);
+        group.add(gltfRoom.scene);
       }
 
-      if (!objA && !objB) {
+      if (!gltfA && !gltfB) {
         usedFallback = true;
       }
     } else {
@@ -324,10 +341,17 @@ export class Viewer {
     this.animationId = requestAnimationFrame(() => this._animate());
 
     const t = this.clock.getElapsedTime();
+    const delta = t - (this._lastTime || 0);
+    this._lastTime = t;
 
     // Update stripe uniforms
     for (const mat of this.activeMats) {
       mat.uniforms.uTime.value = t;
+    }
+
+    // Update GLB animations (model transforms)
+    for (const mixer of this.mixers) {
+      mixer.update(delta);
     }
 
     this.controls.update();

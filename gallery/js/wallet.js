@@ -18,6 +18,7 @@ import {
   AUCTION_CONTRACT_ADDRESS,
   NFT_ABI,
   AUCTION_ABI,
+  ETH_ADDRESS,
 } from './config.js';
 
 // ─────────────────────────────────────────────────────────────────
@@ -164,20 +165,42 @@ export class WalletManager {
     }
 
     try {
-      const data = await this.auctionContract.getAuction(
+      // Read auction config
+      const auction = await this.auctionContract.tokenAuctions(
         NFT_CONTRACT_ADDRESS,
         tokenId,
       );
+      // Read current bid
+      const bidData = await this.auctionContract.auctionBids(
+        NFT_CONTRACT_ADDRESS,
+        tokenId,
+      );
+
+      const hasAuction = auction.auctionCreator !== '0x0000000000000000000000000000000000000000';
+      const hasBid = bidData.bidder !== '0x0000000000000000000000000000000000000000';
+      const lengthOfAuction = Number(auction.lengthOfAuction); // in seconds
+      const startTime = Number(auction.startTime); // unix timestamp (NOT a block number)
+
+      // Compute end time if auction has bids
+      let endTime = 0;
+      let live = false;
+      if (hasBid && startTime > 0 && lengthOfAuction > 0) {
+        endTime = startTime + lengthOfAuction;
+        live = endTime > Math.floor(Date.now() / 1000);
+      }
+
       return {
-        seller:       data.seller,
-        bidder:       data.bidder,
-        amount:       formatEther(data.amount),
-        amountRaw:    data.amount,
-        startTime:    Number(data.startTime),
-        endTime:      Number(data.endTime),
-        reservePrice: formatEther(data.reservePrice),
-        settled:      data.settled,
-        live:         !data.settled && Date.now() / 1000 < Number(data.endTime),
+        seller:       auction.auctionCreator,
+        bidder:       hasBid ? bidData.bidder : null,
+        amount:       formatEther(bidData.amount),
+        amountRaw:    bidData.amount,
+        startTime:    0,
+        endTime:      endTime,
+        reservePrice: formatEther(auction.minimumBid),
+        settled:      false,
+        live:         hasAuction && (hasBid ? live : true),
+        hasBid:       hasBid,
+        pending:      !hasAuction,
       };
     } catch (err) {
       console.warn('[wallet] getAuction failed:', err.message);
@@ -213,12 +236,13 @@ export class WalletManager {
     try {
       const filter = this.auctionContract.filters.AuctionBid(
         NFT_CONTRACT_ADDRESS,
+        null,
         tokenId,
       );
-      const events = await this.auctionContract.queryFilter(filter, -10000);
+      const events = await this.auctionContract.queryFilter(filter, -50000);
       return events.slice(-limit).reverse().map(e => ({
-        bidder: e.args.bidder,
-        amount: formatEther(e.args.amount),
+        bidder: e.args._bidder,
+        amount: formatEther(e.args._amount),
         blockNumber: e.blockNumber,
         txHash: e.transactionHash,
       }));
@@ -240,11 +264,16 @@ export class WalletManager {
     }
 
     try {
-      const value = parseEther(String(ethAmount));
+      const bidAmount = parseEther(String(ethAmount));
+      // Rare Protocol charges 3% marketplace fee on top of bid
+      const fee = bidAmount * 3n / 100n;
+      const totalValue = bidAmount + fee;
       const tx = await this.auctionContract.bid(
         NFT_CONTRACT_ADDRESS,
         tokenId,
-        { value },
+        ETH_ADDRESS,
+        bidAmount,
+        { value: totalValue },
       );
       const receipt = await tx.wait();
       this.onBidPlaced({ txHash: receipt.hash, amount: ethAmount, tokenId });

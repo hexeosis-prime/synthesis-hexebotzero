@@ -88,18 +88,23 @@
           <!-- Auction State -->
           <div class="panel-block" id="auction-block">
             <div class="panel-label">AUCTION</div>
+            <div id="auction-status-banner" class="auction-status-banner"></div>
             <div class="auction-stats">
               <div class="auction-stat">
                 <span class="stat-label">CURRENT BID</span>
                 <span class="stat-value" id="stat-bid">—</span>
               </div>
               <div class="auction-stat">
+                <span class="stat-label">RESERVE PRICE</span>
+                <span class="stat-value" id="stat-reserve">—</span>
+              </div>
+              <div class="auction-stat">
                 <span class="stat-label">TIME LEFT</span>
                 <span class="stat-value" id="stat-time">—</span>
               </div>
               <div class="auction-stat">
-                <span class="stat-label">BIDS</span>
-                <span class="stat-value" id="stat-count">—</span>
+                <span class="stat-label">DURATION</span>
+                <span class="stat-value" id="stat-duration">—</span>
               </div>
             </div>
           </div>
@@ -107,6 +112,7 @@
           <!-- Bid Form -->
           <div class="panel-block" id="bid-block">
             <div class="panel-label">PLACE BID</div>
+            <div id="bid-min-info" class="bid-min-info"></div>
             <div class="bid-row">
               <input
                 type="number"
@@ -134,6 +140,13 @@
           <div class="panel-block" id="meta-block">
             <div class="panel-label">METADATA</div>
             <div id="piece-meta" class="piece-meta"></div>
+          </div>
+
+          <!-- Links -->
+          <div class="panel-block" id="links-block">
+            <div class="panel-label">VIEW ON IPFS</div>
+            <a id="link-animation" class="meta-link" href="#" target="_blank" rel="noopener">⬡ Interactive Token (animation_url) ↗</a>
+            <a id="link-image" class="meta-link" href="#" target="_blank" rel="noopener">⬡ GIF Preview (image) ↗</a>
           </div>
 
         </aside>

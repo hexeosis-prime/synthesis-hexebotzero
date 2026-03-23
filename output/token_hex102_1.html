@@ -88,19 +88,63 @@ async function readChainState() {
     document.getElementById('chain-status').textContent = 'no contract';
     return CHAIN_STATE;
   }
+  const AUCTION_CONTRACT = '0x51c36ffb05e17ed80ee5c02fa83d7677c5613de2';
   try {
     const rpc = async (method, params = []) => {
       const res = await fetch(CONFIG.rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
       });
       return (await res.json()).result;
     };
+
+    // Gas price
     const gasHex = await rpc('eth_gasPrice');
     CHAIN_STATE.gasPrice = parseInt(gasHex, 16);
+
+    // Auction bids: auctionBids(address,uint256) → (address bidder, address currency, uint256 amount, uint8 fee)
+    // selector: 0x0cd87c68 for auctionBids
+    const nftPadded = CONFIG.contractAddress.slice(2).toLowerCase().padStart(64, '0');
+    const tokenPadded = CONFIG.tokenId.toString(16).padStart(64, '0');
+    const bidCalldata = '0x0cd87c68' + nftPadded + tokenPadded;
+    const bidResult = await rpc('eth_call', [{ to: AUCTION_CONTRACT, data: bidCalldata }, 'latest']);
+
+    if (bidResult && bidResult.length >= 258) {
+      const bidderHex = '0x' + bidResult.slice(26, 66);
+      const amountHex = '0x' + bidResult.slice(130, 194);
+      const hasBid = bidderHex !== '0x0000000000000000000000000000000000000000';
+      const bidAmount = parseInt(amountHex, 16);
+      CHAIN_STATE.highestBid = bidAmount / 1e18;
+      CHAIN_STATE.bidCount = hasBid ? Math.max(1, CHAIN_STATE.bidCount) : 0;
+      // Increment bid count if amount changed
+      if (hasBid && bidAmount > (CHAIN_STATE._lastBidAmount || 0)) {
+        CHAIN_STATE.bidCount++;
+        CHAIN_STATE._lastBidAmount = bidAmount;
+      }
+    }
+
+    // Auction config: tokenAuctions(address,uint256)
+    // selector: 0xc47c35c1
+    const auctionCalldata = '0xc47c35c1' + nftPadded + tokenPadded;
+    const auctionResult = await rpc('eth_call', [{ to: AUCTION_CONTRACT, data: auctionCalldata }, 'latest']);
+
+    if (auctionResult && auctionResult.length >= 450) {
+      const startingBlock = parseInt('0x' + auctionResult.slice(130, 194), 16);
+      const lengthOfAuction = parseInt('0x' + auctionResult.slice(194, 258), 16);
+      if (startingBlock > 0 && lengthOfAuction > 0) {
+        const blockHex = await rpc('eth_blockNumber');
+        const currentBlock = parseInt(blockHex, 16);
+        const elapsed = (currentBlock - startingBlock) * 2;
+        CHAIN_STATE.settled = elapsed >= lengthOfAuction;
+      }
+    }
+
+    // Status display
     const gwei = (CHAIN_STATE.gasPrice / 1e9).toFixed(1);
-    document.getElementById('chain-status').textContent = gwei + ' gwei';
+    const bidInfo = CHAIN_STATE.bidCount > 0 ? ' | ' + CHAIN_STATE.bidCount + ' bid' + (CHAIN_STATE.bidCount > 1 ? 's' : '') : '';
+    const settledInfo = CHAIN_STATE.settled ? ' | SETTLED' : '';
+    document.getElementById('chain-status').textContent = gwei + ' gwei' + bidInfo + settledInfo;
   } catch (err) {
     document.getElementById('chain-status').textContent = 'offline';
   }
@@ -290,13 +334,15 @@ async function init() {
     mixers.push(mixer);
   }
 
-  const gltfB = await loadGLB(loader, GLB_B);
-  gltfB.scene.traverse(c => { if (c.isMesh) c.material = matB; });
-  scene.add(gltfB.scene);
-  if (gltfB.animations.length > 0) {
-    const mixer = new THREE.AnimationMixer(gltfB.scene);
-    gltfB.animations.forEach(clip => mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play());
-    mixers.push(mixer);
+  if (GLB_B) {
+    const gltfB = await loadGLB(loader, GLB_B);
+    gltfB.scene.traverse(c => { if (c.isMesh) c.material = matB; });
+    scene.add(gltfB.scene);
+    if (gltfB.animations.length > 0) {
+      const mixer = new THREE.AnimationMixer(gltfB.scene);
+      gltfB.animations.forEach(clip => mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play());
+      mixers.push(mixer);
+    }
   }
 
   const gltfRoom = await loadGLB(loader, GLB_ROOM);

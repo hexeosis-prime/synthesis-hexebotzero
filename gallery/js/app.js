@@ -160,9 +160,9 @@ class App {
           `<div class="palette-chip" style="background:${c}" title="${c}"></div>`
         ).join('')}</div>
         <div class="piece-auction-row">
-          <span class="piece-auction-status">
+          <span class="piece-auction-status" id="card-status-${piece.id}">
             <span class="auction-live-dot"></span>
-            AUCTION PENDING
+            RESERVE 0.005 ETH
           </span>
           <span class="piece-bid" id="card-bid-${piece.id}">—</span>
         </div>
@@ -186,10 +186,20 @@ class App {
 
   async _fetchCardAuction(piece) {
     const auc = await this.wallet.getAuction(piece.tokenId);
-    const el  = document.getElementById(`card-bid-${piece.id}`);
-    if (!el) return;
-    if (auc?.amount && parseFloat(auc.amount) > 0) {
-      el.textContent = `${parseFloat(auc.amount).toFixed(3)} ETH`;
+    const bidEl    = document.getElementById(`card-bid-${piece.id}`);
+    const statusEl = document.getElementById(`card-status-${piece.id}`);
+    if (!bidEl) return;
+
+    if (auc?.hasBid && parseFloat(auc.amount) > 0) {
+      bidEl.textContent = `${parseFloat(auc.amount).toFixed(3)} ETH`;
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="auction-live-dot live"></span> AUCTION LIVE';
+      }
+    } else if (auc && !auc.pending) {
+      bidEl.textContent = 'NO BIDS';
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="auction-live-dot awaiting"></span> RESERVE ${parseFloat(auc.reservePrice || '0.005').toFixed(3)} ETH`;
+      }
     }
   }
 
@@ -209,6 +219,19 @@ class App {
 
     // Piece metadata
     this._renderPieceMeta(piece);
+
+    // IPFS links
+    const animLink = document.getElementById('link-animation');
+    const imgLink = document.getElementById('link-image');
+    if (piece.onChain?.ipfsAnimationCid) {
+      animLink.href = `${IPFS_GATEWAY}${piece.onChain.ipfsAnimationCid}`;
+      animLink.style.display = '';
+    } else {
+      animLink.style.display = 'none';
+    }
+    if (piece.thumbnailCid) {
+      imgLink.href = `${IPFS_GATEWAY}${piece.thumbnailCid}`;
+    }
 
     // Boot viewer
     const container = document.getElementById('viewer-container');
@@ -258,36 +281,72 @@ class App {
   }
 
   _renderAuction(auc) {
-    const bidEl   = document.getElementById('stat-bid');
-    const timeEl  = document.getElementById('stat-time');
-    const countEl = document.getElementById('stat-count');
+    const bidEl      = document.getElementById('stat-bid');
+    const reserveEl  = document.getElementById('stat-reserve');
+    const timeEl     = document.getElementById('stat-time');
+    const durationEl = document.getElementById('stat-duration');
+    const bannerEl   = document.getElementById('auction-status-banner');
+    const minInfoEl  = document.getElementById('bid-min-info');
 
     if (!auc) {
-      bidEl.textContent   = '—';
-      timeEl.textContent  = '—';
-      countEl.textContent = '—';
+      bidEl.textContent      = '—';
+      reserveEl.textContent  = '—';
+      timeEl.textContent     = '—';
+      durationEl.textContent = '—';
+      bannerEl.textContent   = '';
+      minInfoEl.textContent  = '';
       return;
     }
 
     if (auc.pending) {
-      bidEl.textContent   = 'PENDING';
-      timeEl.textContent  = 'CONTRACT TBD';
-      countEl.textContent = '—';
+      bidEl.textContent      = '—';
+      reserveEl.textContent  = '—';
+      timeEl.textContent     = '—';
+      durationEl.textContent = '—';
+      bannerEl.textContent   = 'AUCTION NOT YET CONFIGURED';
+      bannerEl.className     = 'auction-status-banner status-pending';
+      minInfoEl.textContent  = '';
       return;
     }
 
-    const bidAmt = parseFloat(auc.amount);
-    bidEl.textContent = bidAmt > 0 ? `${bidAmt.toFixed(4)} ETH` : `${parseFloat(auc.reservePrice).toFixed(4)} ETH (reserve)`;
+    const reserve = parseFloat(auc.reservePrice);
+    const bidAmt  = parseFloat(auc.amount);
+    const hasBid  = auc.hasBid || bidAmt > 0;
 
-    if (auc.settled) {
-      timeEl.textContent  = 'SETTLED';
-      countEl.textContent = '—';
-    } else if (!auc.live) {
-      timeEl.textContent  = '—';
-      countEl.textContent = '—';
+    // Reserve price
+    reserveEl.textContent = `${reserve.toFixed(4)} ETH`;
+
+    // Duration
+    durationEl.textContent = '24 HOURS';
+
+    // Current bid
+    if (hasBid) {
+      bidEl.textContent = `${bidAmt.toFixed(4)} ETH`;
     } else {
-      // Countdown starts via startCountdown
-      countEl.textContent = '—';
+      bidEl.textContent = 'NO BIDS YET';
+    }
+
+    // Status banner + time
+    if (auc.settled) {
+      bannerEl.textContent = 'AUCTION SETTLED';
+      bannerEl.className   = 'auction-status-banner status-settled';
+      timeEl.textContent   = 'ENDED';
+      minInfoEl.textContent = '';
+    } else if (hasBid && auc.endTime > 0) {
+      bannerEl.textContent = '⬡ AUCTION LIVE';
+      bannerEl.className   = 'auction-status-banner status-live';
+      // Countdown handled by startCountdown
+      // Min bid info
+      const minNext = (bidAmt * 1.05).toFixed(4);
+      const minFee = (bidAmt * 1.05 * 0.03).toFixed(4);
+      minInfoEl.textContent = `Minimum bid: ${minNext} ETH (5% above current). A 3% marketplace fee (${minFee} ETH) is added automatically.`;
+    } else {
+      bannerEl.textContent = 'AWAITING FIRST BID';
+      bannerEl.className   = 'auction-status-banner status-awaiting';
+      timeEl.textContent   = 'STARTS ON FIRST BID';
+      // Min bid info
+      const reserveFee = (reserve * 0.03).toFixed(4);
+      minInfoEl.textContent = `Minimum first bid: ${reserve.toFixed(4)} ETH (reserve price). A 3% marketplace fee (${reserveFee} ETH) is added automatically. 24h countdown begins when first bid is placed.`;
     }
   }
 
@@ -312,7 +371,7 @@ class App {
       ['COLLECTION',  'SYNTHESIS'],
       ['CHAIN',       'Base (8453)'],
       ['CREATOR',     'HEXEBOTZERO'],
-      ['PALETTE',     piece.attributes?.find(a => a.trait_type === 'Palette')?.value || '—'],
+      ['PALETTE',     piece.attributes?.find(a => a.trait_type === 'Palette A')?.value || piece.attributes?.find(a => a.trait_type === 'Palette')?.value || '—'],
       ['SCROLL A',    piece.scrollSpeedA],
       ['SCROLL B',    piece.scrollSpeedB],
       ['BANDS',       '12'],

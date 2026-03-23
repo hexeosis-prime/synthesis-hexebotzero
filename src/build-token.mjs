@@ -50,16 +50,40 @@ const PRESETS = {
     scrollSpeedB: -0.333,
     vignetteIntensity: 0.6,
   },
+  squares201: {
+    geometryA: 'squares201A',
+    geometryB: 'squares201B',
+    paletteAKey: 'N2_spectral_hot',
+    paletteBKey: 'A3_warm_neon',
+    cameraPos: [0, 0, 5],
+    cameraTarget: [0, 0, -10],
+    cameraFOV: 65,
+    scrollSpeedA: 0.333,
+    scrollSpeedB: 0.333,
+    vignetteIntensity: 0.55,
+  },
+  hexagons306: {
+    geometryA: 'hexagons306',
+    geometryB: null,
+    paletteAKey: 'tv3_sorbet',
+    paletteBKey: 'tv3_sorbet',
+    cameraPos: [0, 2, 8],
+    cameraTarget: [0, 0, -5],
+    cameraFOV: 55,
+    scrollSpeedA: 0.333,
+    scrollSpeedB: 0,
+    vignetteIntensity: 0.6,
+  },
   pyramids101: {
-    geometryA: 'hex102A',
-    geometryB: 'hex102B',
-    paletteAKey: 'tv1_candy',
-    paletteBKey: 'A1_neon_black',
+    geometryA: 'pyramids101A',
+    geometryB: 'pyramids101B',
+    paletteAKey: 'S1_spectrum',
+    paletteBKey: 'A2_neon_black_alt',
     cameraPos: [0, 3, 10],
-    cameraTarget: [0, 0, -3],
+    cameraTarget: [0, 0, -8],
     cameraFOV: 50,
-    scrollSpeedA: 0.25,
-    scrollSpeedB: -0.25,
+    scrollSpeedA: 0.333,
+    scrollSpeedB: 0.333,
     vignetteIntensity: 0.5,
   },
 };
@@ -70,11 +94,11 @@ const paletteB = palettes[config.paletteBKey] || palettes.K1_earthy;
 
 // Get GLB base64 data
 const glbA = glbData[config.geometryA];
-const glbB = glbData[config.geometryB];
+const glbB = config.geometryB ? glbData[config.geometryB] : null;
 const glbRoom = glbData.hexRoom;
 
-if (!glbA || !glbB || !glbRoom) {
-  console.error('Missing GLB data for preset:', preset);
+if (!glbA || !glbRoom) {
+  console.error('Missing GLB data for preset:', preset, '(need at least geometryA and room)');
   process.exit(1);
 }
 
@@ -138,7 +162,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // === EMBEDDED GEOMETRY (base64-encoded GLB) ===
 const GLB_A = '${glbA}';
-const GLB_B = '${glbB}';
+const GLB_B = ${glbB ? `'${glbB}'` : 'null'};
 const GLB_ROOM = '${glbRoom}';
 
 // === TOKEN CONFIG ===
@@ -168,19 +192,63 @@ async function readChainState() {
     document.getElementById('chain-status').textContent = 'no contract';
     return CHAIN_STATE;
   }
+  const AUCTION_CONTRACT = '0x51c36ffb05e17ed80ee5c02fa83d7677c5613de2';
   try {
     const rpc = async (method, params = []) => {
       const res = await fetch(CONFIG.rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
       });
       return (await res.json()).result;
     };
+
+    // Gas price
     const gasHex = await rpc('eth_gasPrice');
     CHAIN_STATE.gasPrice = parseInt(gasHex, 16);
+
+    // Auction bids: auctionBids(address,uint256) → (address bidder, address currency, uint256 amount, uint8 fee)
+    // selector: 0x0cd87c68 for auctionBids
+    const nftPadded = CONFIG.contractAddress.slice(2).toLowerCase().padStart(64, '0');
+    const tokenPadded = CONFIG.tokenId.toString(16).padStart(64, '0');
+    const bidCalldata = '0x0cd87c68' + nftPadded + tokenPadded;
+    const bidResult = await rpc('eth_call', [{ to: AUCTION_CONTRACT, data: bidCalldata }, 'latest']);
+
+    if (bidResult && bidResult.length >= 258) {
+      const bidderHex = '0x' + bidResult.slice(26, 66);
+      const amountHex = '0x' + bidResult.slice(130, 194);
+      const hasBid = bidderHex !== '0x0000000000000000000000000000000000000000';
+      const bidAmount = parseInt(amountHex, 16);
+      CHAIN_STATE.highestBid = bidAmount / 1e18;
+      CHAIN_STATE.bidCount = hasBid ? Math.max(1, CHAIN_STATE.bidCount) : 0;
+      // Increment bid count if amount changed
+      if (hasBid && bidAmount > (CHAIN_STATE._lastBidAmount || 0)) {
+        CHAIN_STATE.bidCount++;
+        CHAIN_STATE._lastBidAmount = bidAmount;
+      }
+    }
+
+    // Auction config: tokenAuctions(address,uint256)
+    // selector: 0xc47c35c1
+    const auctionCalldata = '0xc47c35c1' + nftPadded + tokenPadded;
+    const auctionResult = await rpc('eth_call', [{ to: AUCTION_CONTRACT, data: auctionCalldata }, 'latest']);
+
+    if (auctionResult && auctionResult.length >= 450) {
+      const startingBlock = parseInt('0x' + auctionResult.slice(130, 194), 16);
+      const lengthOfAuction = parseInt('0x' + auctionResult.slice(194, 258), 16);
+      if (startingBlock > 0 && lengthOfAuction > 0) {
+        const blockHex = await rpc('eth_blockNumber');
+        const currentBlock = parseInt(blockHex, 16);
+        const elapsed = (currentBlock - startingBlock) * 2;
+        CHAIN_STATE.settled = elapsed >= lengthOfAuction;
+      }
+    }
+
+    // Status display
     const gwei = (CHAIN_STATE.gasPrice / 1e9).toFixed(1);
-    document.getElementById('chain-status').textContent = gwei + ' gwei';
+    const bidInfo = CHAIN_STATE.bidCount > 0 ? ' | ' + CHAIN_STATE.bidCount + ' bid' + (CHAIN_STATE.bidCount > 1 ? 's' : '') : '';
+    const settledInfo = CHAIN_STATE.settled ? ' | SETTLED' : '';
+    document.getElementById('chain-status').textContent = gwei + ' gwei' + bidInfo + settledInfo;
   } catch (err) {
     document.getElementById('chain-status').textContent = 'offline';
   }
@@ -370,13 +438,15 @@ async function init() {
     mixers.push(mixer);
   }
 
-  const gltfB = await loadGLB(loader, GLB_B);
-  gltfB.scene.traverse(c => { if (c.isMesh) c.material = matB; });
-  scene.add(gltfB.scene);
-  if (gltfB.animations.length > 0) {
-    const mixer = new THREE.AnimationMixer(gltfB.scene);
-    gltfB.animations.forEach(clip => mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play());
-    mixers.push(mixer);
+  if (GLB_B) {
+    const gltfB = await loadGLB(loader, GLB_B);
+    gltfB.scene.traverse(c => { if (c.isMesh) c.material = matB; });
+    scene.add(gltfB.scene);
+    if (gltfB.animations.length > 0) {
+      const mixer = new THREE.AnimationMixer(gltfB.scene);
+      gltfB.animations.forEach(clip => mixer.clipAction(clip).setLoop(THREE.LoopRepeat).play());
+      mixers.push(mixer);
+    }
   }
 
   const gltfRoom = await loadGLB(loader, GLB_ROOM);
@@ -457,5 +527,5 @@ console.log(`  Contract: ${contractAddress}`);
 console.log(`  Token ID: ${tokenId}`);
 console.log(`  Size: ${sizeKB} KB`);
 console.log(`  Output: ${outPath}`);
-console.log(`  Embedded: 3 GLB models (${(Buffer.byteLength(glbA + glbB + glbRoom, 'utf-8') / 1024).toFixed(0)} KB base64)`);
+console.log(`  Embedded: ${glbB ? 3 : 2} GLB models (${(Buffer.byteLength(glbA + (glbB || '') + glbRoom, 'utf-8') / 1024).toFixed(0)} KB base64)`);
 console.log(`  Features: OrbitControls, chain-reactive params, vignette, procedural stripes`);
