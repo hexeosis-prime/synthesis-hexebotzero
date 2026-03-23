@@ -79,6 +79,11 @@ class App {
       document.getElementById('btn-bid').disabled = !(val > 0 && this.wallet.isConnected);
     });
 
+    // Settle button
+    document.getElementById('btn-settle').addEventListener('click', () => {
+      this._submitSettle();
+    });
+
     // Build gallery
     this._buildGallery();
 
@@ -193,7 +198,11 @@ class App {
     if (auc?.hasBid && parseFloat(auc.amount) > 0) {
       bidEl.textContent = `${parseFloat(auc.amount).toFixed(3)} ETH`;
       if (statusEl) {
-        statusEl.innerHTML = '<span class="auction-live-dot live"></span> AUCTION LIVE';
+        if (auc.expired) {
+          statusEl.innerHTML = '<span class="auction-live-dot expired"></span> ENDED — SETTLE';
+        } else {
+          statusEl.innerHTML = '<span class="auction-live-dot live"></span> AUCTION LIVE';
+        }
       }
     } else if (auc && !auc.pending) {
       bidEl.textContent = 'NO BIDS';
@@ -287,6 +296,12 @@ class App {
     const durationEl = document.getElementById('stat-duration');
     const bannerEl   = document.getElementById('auction-status-banner');
     const minInfoEl  = document.getElementById('bid-min-info');
+    const settleWrap = document.getElementById('settle-block');
+    const bidBlock   = document.getElementById('bid-block');
+
+    // Hide settle by default, show bid form by default
+    settleWrap.classList.add('hidden');
+    bidBlock.classList.remove('hidden');
 
     if (!auc) {
       bidEl.textContent      = '—';
@@ -319,9 +334,16 @@ class App {
     // Duration
     durationEl.textContent = '24 HOURS';
 
-    // Current bid
+    // Current bid (with bidder name)
     if (hasBid) {
       bidEl.textContent = `${bidAmt.toFixed(4)} ETH`;
+      // Async resolve bidder name
+      if (auc.bidder) {
+        this.wallet.displayName(auc.bidder).then(name => {
+          const bidderEl = document.getElementById('stat-bidder');
+          if (bidderEl) bidderEl.textContent = name;
+        });
+      }
     } else {
       bidEl.textContent = 'NO BIDS YET';
     }
@@ -332,6 +354,15 @@ class App {
       bannerEl.className   = 'auction-status-banner status-settled';
       timeEl.textContent   = 'ENDED';
       minInfoEl.textContent = '';
+      bidBlock.classList.add('hidden');
+    } else if (auc.expired) {
+      // Auction ended but not yet settled — show settle button
+      bannerEl.textContent = '⬡ AUCTION ENDED — READY TO SETTLE';
+      bannerEl.className   = 'auction-status-banner status-expired';
+      timeEl.textContent   = 'ENDED';
+      minInfoEl.textContent = '';
+      bidBlock.classList.add('hidden');
+      settleWrap.classList.remove('hidden');
     } else if (hasBid && auc.endTime > 0) {
       bannerEl.textContent = '⬡ AUCTION LIVE';
       bannerEl.className   = 'auction-status-banner status-live';
@@ -356,12 +387,26 @@ class App {
       el.innerHTML = '<div class="bid-empty">No bids yet</div>';
       return;
     }
-    el.innerHTML = bids.map(b => `
-      <div class="bid-entry">
-        <span class="bid-entry-addr">${this.wallet.shortAddress(b.bidder)}</span>
-        <span class="bid-entry-amount">${parseFloat(b.amount).toFixed(4)} ETH</span>
-      </div>
-    `).join('');
+    el.innerHTML = bids.map(b => {
+      const timeStr = b.timestamp
+        ? new Date(b.timestamp * 1000).toLocaleString(undefined, {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+          })
+        : '';
+      const txUrl = `https://basescan.org/tx/${b.txHash}`;
+      return `
+        <div class="bid-entry">
+          <div class="bid-entry-top">
+            <a class="bid-entry-name" href="https://basescan.org/address/${b.bidder}" target="_blank" rel="noopener" title="${b.bidder}">${b.displayName}</a>
+            <span class="bid-entry-amount">${parseFloat(b.amount).toFixed(4)} ETH</span>
+          </div>
+          <div class="bid-entry-bottom">
+            <span class="bid-entry-time">${timeStr}</span>
+            <a class="bid-entry-tx" href="${txUrl}" target="_blank" rel="noopener" title="View on BaseScan">tx ↗</a>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   _renderPieceMeta(piece) {
@@ -407,6 +452,29 @@ class App {
     }
 
     document.getElementById('btn-bid').disabled = false;
+  }
+
+  // ── Settle auction ────────────────────────────────────────
+  async _submitSettle() {
+    if (!this.current) return;
+    const btn = document.getElementById('btn-settle');
+    const statusEl = document.getElementById('settle-status');
+
+    btn.disabled = true;
+    statusEl.textContent = 'Awaiting wallet confirmation…';
+    statusEl.className = 'bid-status';
+
+    const receipt = await this.wallet.settleAuction(this.current.tokenId);
+    if (receipt) {
+      statusEl.textContent = `Settled ✓  tx: ${receipt.hash.slice(0, 14)}…`;
+      statusEl.className = 'bid-status success';
+      // Reload auction state to reflect settlement
+      setTimeout(() => this._loadAuction(this.current), 2000);
+    } else {
+      statusEl.className = 'bid-status error';
+    }
+
+    btn.disabled = false;
   }
 
   _onBidPlaced(info) {

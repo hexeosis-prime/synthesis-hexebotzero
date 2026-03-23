@@ -321,6 +321,11 @@ nav {
   background: #ffd548;
 }
 
+.auction-live-dot.expired {
+  background: #ff9500;
+  animation: none;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
@@ -564,6 +569,45 @@ nav {
   border-color: var(--border);
 }
 
+.status-expired {
+  color: #ff9500;
+  border-color: #ff950044;
+  background: #ff950008;
+}
+
+/* Stat sub-label (bidder name under bid amount) */
+.stat-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--fg-dim);
+  letter-spacing: 0.04em;
+  margin-top: 0.15rem;
+}
+
+.stat-sub:empty {
+  display: none;
+}
+
+/* Settle block */
+.settle-info {
+  font-size: 10px;
+  color: var(--fg-dim);
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.btn-settle {
+  background: #ff9500;
+  color: #000;
+  border-color: #ff9500;
+}
+
+.btn-settle:hover {
+  background: #ffaa33;
+  border-color: #ffaa33;
+}
+
 /* Bid min info */
 .bid-min-info {
   font-size: 10px;
@@ -645,8 +689,8 @@ nav {
 
 .bid-entry {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 0.2rem;
   font-size: 10px;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
@@ -654,6 +698,31 @@ nav {
 
 .bid-entry:last-child {
   border-bottom: none;
+}
+
+.bid-entry-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.bid-entry-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.bid-entry-name {
+  color: var(--fg);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+
+.bid-entry-name:hover {
+  text-decoration: underline;
+  color: #00ff88;
 }
 
 .bid-entry-addr {
@@ -664,6 +733,24 @@ nav {
 .bid-entry-amount {
   font-weight: 700;
   letter-spacing: 0.06em;
+}
+
+.bid-entry-time {
+  color: var(--fg-dimmer);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.bid-entry-tx {
+  color: var(--fg-dimmer);
+  font-size: 9px;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+
+.bid-entry-tx:hover {
+  color: #00ff88;
+  text-decoration: underline;
 }
 
 /* Piece metadata */

@@ -57,9 +57,35 @@ export class WalletManager {
         AUCTION_ABI,
         this.readProvider,
       );
+      // Mainnet provider for ENS resolution
+      this.ensProvider = new JsonRpcProvider('https://eth.llamarpc.com');
+      // ENS cache: address → name|null
+      this._ensCache = {};
     } catch (err) {
       console.warn('[wallet] read provider init failed:', err.message);
     }
+  }
+
+  // ── Resolve ENS name for an address ──────────────────────────
+  async resolveENS(address) {
+    if (!address) return null;
+    const lower = address.toLowerCase();
+    if (lower in this._ensCache) return this._ensCache[lower];
+    try {
+      const name = await this.ensProvider.lookupAddress(address);
+      this._ensCache[lower] = name;
+      return name;
+    } catch (err) {
+      console.warn('[wallet] ENS lookup failed for', address, err.message);
+      this._ensCache[lower] = null;
+      return null;
+    }
+  }
+
+  // ── Display name: ENS or short address ───────────────────────
+  async displayName(address) {
+    const ens = await this.resolveENS(address);
+    return ens || this.shortAddress(address);
   }
 
   // ── Connect MetaMask ─────────────────────────────────────────
@@ -152,8 +178,8 @@ export class WalletManager {
     return addr.slice(0, 6) + '…' + addr.slice(-4);
   }
 
-  // ── Read auction state ────────────────────────────────────────
-  async getAuction(tokenId) {
+  // ── Read auction state (with retry for RPC flakiness) ────────
+  async getAuction(tokenId, _retries = 2) {
     if (!this.auctionContract) return null;
 
     // If contract address is placeholder, return mock state
@@ -165,16 +191,11 @@ export class WalletManager {
     }
 
     try {
-      // Read auction config
-      const auction = await this.auctionContract.tokenAuctions(
-        NFT_CONTRACT_ADDRESS,
-        tokenId,
-      );
-      // Read current bid
-      const bidData = await this.auctionContract.auctionBids(
-        NFT_CONTRACT_ADDRESS,
-        tokenId,
-      );
+      // Read auction config and current bid in parallel
+      const [auction, bidData] = await Promise.all([
+        this.auctionContract.tokenAuctions(NFT_CONTRACT_ADDRESS, tokenId),
+        this.auctionContract.auctionBids(NFT_CONTRACT_ADDRESS, tokenId),
+      ]);
 
       const hasAuction = auction.auctionCreator !== '0x0000000000000000000000000000000000000000';
       const hasBid = bidData.bidder !== '0x0000000000000000000000000000000000000000';
@@ -189,21 +210,30 @@ export class WalletManager {
         live = endTime > Math.floor(Date.now() / 1000);
       }
 
+      // Detect settled: auction has bid but time expired and not yet claimed
+      const expired = hasBid && endTime > 0 && endTime <= Math.floor(Date.now() / 1000);
+
       return {
         seller:       auction.auctionCreator,
         bidder:       hasBid ? bidData.bidder : null,
         amount:       formatEther(bidData.amount),
         amountRaw:    bidData.amount,
-        startTime:    0,
+        startTime:    startTime,
         endTime:      endTime,
         reservePrice: formatEther(auction.minimumBid),
         settled:      false,
+        expired:      expired,
         live:         hasAuction && (hasBid ? live : true),
         hasBid:       hasBid,
         pending:      !hasAuction,
       };
     } catch (err) {
-      console.warn('[wallet] getAuction failed:', err.message);
+      console.warn(`[wallet] getAuction failed (retries left: ${_retries}):`, err.message);
+      if (_retries > 0) {
+        // Wait 1s and retry — Base public RPC can be flaky
+        await new Promise(r => setTimeout(r, 1000));
+        return this.getAuction(tokenId, _retries - 1);
+      }
       return this._mockAuctionState(tokenId);
     }
   }
@@ -224,7 +254,7 @@ export class WalletManager {
     };
   }
 
-  // ── Get bid history from events ───────────────────────────────
+  // ── Get bid history from events (with ENS + timestamps) ──────
   async getBidHistory(tokenId, limit = 20) {
     if (
       !this.auctionContract ||
@@ -240,12 +270,25 @@ export class WalletManager {
         tokenId,
       );
       const events = await this.auctionContract.queryFilter(filter, -50000);
-      return events.slice(-limit).reverse().map(e => ({
-        bidder: e.args._bidder,
-        amount: formatEther(e.args._amount),
-        blockNumber: e.blockNumber,
-        txHash: e.transactionHash,
+      const recent = events.slice(-limit).reverse();
+
+      // Resolve timestamps and ENS names in parallel
+      const enriched = await Promise.all(recent.map(async (e) => {
+        const [block, displayName] = await Promise.all([
+          this.readProvider.getBlock(e.blockNumber).catch(() => null),
+          this.displayName(e.args._bidder),
+        ]);
+        return {
+          bidder:      e.args._bidder,
+          displayName: displayName,
+          amount:      formatEther(e.args._amount),
+          blockNumber: e.blockNumber,
+          txHash:      e.transactionHash,
+          timestamp:   block ? block.timestamp : null,
+        };
       }));
+
+      return enriched;
     } catch (err) {
       console.warn('[wallet] getBidHistory failed:', err.message);
       return [];
@@ -281,6 +324,32 @@ export class WalletManager {
     } catch (err) {
       console.error('[wallet] placeBid failed:', err);
       const msg = err.reason || err.shortMessage || err.message || 'Bid failed.';
+      this.onError(msg);
+      return null;
+    }
+  }
+
+  // ── Settle auction ─────────────────────────────────────────────
+  async settleAuction(tokenId) {
+    if (!this.isConnected) {
+      this.onError('Connect wallet first.');
+      return null;
+    }
+    if (AUCTION_CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') {
+      this.onError('Contract not deployed yet.');
+      return null;
+    }
+
+    try {
+      const tx = await this.auctionContract.settleAuction(
+        NFT_CONTRACT_ADDRESS,
+        tokenId,
+      );
+      const receipt = await tx.wait();
+      return receipt;
+    } catch (err) {
+      console.error('[wallet] settleAuction failed:', err);
+      const msg = err.reason || err.shortMessage || err.message || 'Settlement failed.';
       this.onError(msg);
       return null;
     }

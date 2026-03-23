@@ -93,6 +93,7 @@
               <div class="auction-stat">
                 <span class="stat-label">CURRENT BID</span>
                 <span class="stat-value" id="stat-bid">—</span>
+                <span class="stat-sub" id="stat-bidder"></span>
               </div>
               <div class="auction-stat">
                 <span class="stat-label">RESERVE PRICE</span>
@@ -126,6 +127,14 @@
             </div>
             <button id="btn-bid" class="btn-primary" disabled>PLACE BID</button>
             <div id="bid-status" class="bid-status"></div>
+          </div>
+
+          <!-- Settle Auction -->
+          <div class="panel-block hidden" id="settle-block">
+            <div class="panel-label">SETTLE AUCTION</div>
+            <p class="settle-info">Auction has ended. Settle to transfer the token to the winner and release funds to the seller.</p>
+            <button id="btn-settle" class="btn-primary btn-settle">SETTLE AUCTION</button>
+            <div id="settle-status" class="bid-status"></div>
           </div>
 
           <!-- Bid History -->
