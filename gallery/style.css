@@ -325,6 +325,14 @@ nav {
   background: #ff9500;
   animation: none;
 }
+.auction-live-dot.paused {
+  background: #888;
+  animation: none;
+}
+.auction-live-dot.sold {
+  background: #00ff88;
+  animation: none;
+}
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
@@ -408,6 +416,25 @@ nav {
 
 .viewer-error {
   background: rgba(0,0,0,0.7);
+}
+
+.viewer-hint {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--fg-dimmer);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 1.5s ease;
+  z-index: 5;
+}
+
+.viewer-hint.hidden {
+  opacity: 0;
 }
 
 .loading-hex {
@@ -573,6 +600,12 @@ nav {
   color: #ff9500;
   border-color: #ff950044;
   background: #ff950008;
+}
+
+.status-sold {
+  color: #00ff88;
+  border-color: #00ff8844;
+  background: #00ff8808;
 }
 
 /* Stat sub-label (bidder name under bid amount) */

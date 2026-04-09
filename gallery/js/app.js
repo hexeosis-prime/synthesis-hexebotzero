@@ -25,6 +25,7 @@ class App {
     this.viewer  = null;
     this.wallet  = null;
     this.current = null;   // current piece
+    this._auctionEpoch = 0; // incremented on each piece open to cancel stale async
     this.sections = {};
 
     this._init();
@@ -62,7 +63,10 @@ class App {
       onConnect:    addr  => this._onWalletConnect(addr),
       onDisconnect: ()    => this._onWalletDisconnect(),
       onBidPlaced:  info  => this._onBidPlaced(info),
-      onError:      msg   => this._setBidStatus(msg, 'error'),
+      onError:      msg   => {
+        this._setBidStatus(msg, 'error');
+        this._setSettleStatus(msg, 'error');
+      },
     });
 
     document.getElementById('btn-connect').addEventListener('click', () => {
@@ -183,10 +187,22 @@ class App {
       });
 
       grid.appendChild(card);
+
+      // Override card status for sold pieces
+      if (piece.sold) {
+        const statusEl = document.getElementById(`card-status-${piece.id}`);
+        if (statusEl) {
+          statusEl.innerHTML = `<span class="auction-live-dot sold"></span> SOLD`;
+        }
+        const bidEl = document.getElementById(`card-bid-${piece.id}`);
+        if (bidEl) {
+          bidEl.textContent = `${piece.soldPrice} ETH → ${piece.soldTo}`;
+        }
+      }
     });
 
-    // Kick off read-only auction fetches for gallery cards
-    PIECES.forEach(piece => this._fetchCardAuction(piece));
+    // Kick off read-only auction fetches for gallery cards (skip sold)
+    PIECES.filter(p => !p.sold).forEach(piece => this._fetchCardAuction(piece));
   }
 
   async _fetchCardAuction(piece) {
@@ -215,6 +231,7 @@ class App {
   // ── Open Piece Detail ────────────────────────────────────────
   _openPiece(piece) {
     this.current = piece;
+    this._auctionEpoch++;  // invalidate any in-flight async from previous piece
     this._showSection('detail');
 
     // Set title
@@ -225,6 +242,22 @@ class App {
     strip.innerHTML = piece.palette.map(c =>
       `<div class="palette-strip-chip" style="background:${c}"></div>`
     ).join('');
+
+    // Reset auction UI from previous piece
+    document.getElementById('stat-bid').textContent = '—';
+    document.getElementById('stat-reserve').textContent = '—';
+    document.getElementById('stat-time').textContent = '—';
+    document.getElementById('stat-duration').textContent = '—';
+    document.getElementById('stat-bidder').textContent = '';
+    document.getElementById('auction-status-banner').textContent = '';
+    document.getElementById('bid-status').textContent = '';
+    document.getElementById('bid-min-info').textContent = '';
+    document.getElementById('bid-input').value = '';
+    document.getElementById('btn-bid').disabled = true;
+    document.getElementById('bid-history').innerHTML = '<div class="bid-empty">Loading…</div>';
+    document.getElementById('settle-block').classList.add('hidden');
+    document.getElementById('bid-block').classList.remove('hidden');
+    this._setSettleStatus('');
 
     // Piece metadata
     this._renderPieceMeta(piece);
@@ -248,6 +281,19 @@ class App {
     document.getElementById('viewer-loading').classList.remove('hidden');
     document.getElementById('viewer-error').classList.add('hidden');
 
+    // Show orbit hint, fade on first interaction
+    const hint = document.getElementById('viewer-hint');
+    if (hint) {
+      hint.classList.remove('hidden');
+      const hideHint = () => {
+        hint.classList.add('hidden');
+        container.removeEventListener('pointerdown', hideHint);
+        container.removeEventListener('touchstart', hideHint);
+      };
+      container.addEventListener('pointerdown', hideHint, { once: true });
+      container.addEventListener('touchstart', hideHint, { once: true });
+    }
+
     this.viewer = new Viewer(container, {
       onLoadStart: () => {
         document.getElementById('viewer-loading').classList.remove('hidden');
@@ -268,17 +314,43 @@ class App {
 
     this.viewer.loadPiece(piece);
 
+    // Check if sold
+    if (piece.sold) {
+      document.getElementById('bid-block').classList.add('hidden');
+      document.getElementById('settle-block').classList.add('hidden');
+      document.getElementById('auction-status-banner').textContent = '⬡ SOLD';
+      document.getElementById('auction-status-banner').className = 'auction-status-banner status-sold';
+      const ownerLink = `<a href="https://basescan.org/address/${piece.soldToAddress}" target="_blank" rel="noopener">${piece.soldTo}</a>`;
+      document.getElementById('bid-min-info').innerHTML = `Collected by ${ownerLink} for ${piece.soldPrice} ETH on ${piece.soldDate}.`;
+      document.getElementById('stat-bid').textContent = `${piece.soldPrice} ETH`;
+      document.getElementById('stat-time').textContent = 'ENDED';
+    }
+
     // Auction state
     this._loadAuction(piece);
   }
 
   // ── Auction ──────────────────────────────────────────────────
   async _loadAuction(piece) {
+    const epoch = this._auctionEpoch;
+    const stale = () => this._auctionEpoch !== epoch;
+
     const auc = await this.wallet.getAuction(piece.tokenId);
-    this._renderAuction(auc);
+    if (stale()) return;  // user navigated away
+
+    this._renderAuction(auc, stale);
+
+    // Re-enforce sold state after render
+    if (piece.sold) {
+      document.getElementById('bid-block').classList.add('hidden');
+      document.getElementById('settle-block').classList.add('hidden');
+      document.getElementById('auction-status-banner').textContent = '⬡ SOLD';
+      document.getElementById('auction-status-banner').className = 'auction-status-banner status-sold';
+    }
 
     if (auc?.live && auc.endTime > 0) {
       this.wallet.startCountdown(auc.endTime, remaining => {
+        if (stale()) { this.wallet.stopCountdown(); return; }
         document.getElementById('stat-time').textContent =
           WalletManager.formatTime(remaining);
       });
@@ -286,10 +358,11 @@ class App {
 
     // Bid history
     const history = await this.wallet.getBidHistory(piece.tokenId);
+    if (stale()) return;
     this._renderBidHistory(history);
   }
 
-  _renderAuction(auc) {
+  _renderAuction(auc, stale = () => false) {
     const bidEl      = document.getElementById('stat-bid');
     const reserveEl  = document.getElementById('stat-reserve');
     const timeEl     = document.getElementById('stat-time');
@@ -299,9 +372,12 @@ class App {
     const settleWrap = document.getElementById('settle-block');
     const bidBlock   = document.getElementById('bid-block');
 
-    // Hide settle by default, show bid form by default
+    // Hide settle by default, show bid form by default (unless bidding disabled)
     settleWrap.classList.add('hidden');
-    bidBlock.classList.remove('hidden');
+    const isBiddingDisabled = this.current?.biddingDisabled;
+    if (!isBiddingDisabled) {
+      bidBlock.classList.remove('hidden');
+    }
 
     if (!auc) {
       bidEl.textContent      = '—';
@@ -337,9 +413,10 @@ class App {
     // Current bid (with bidder name)
     if (hasBid) {
       bidEl.textContent = `${bidAmt.toFixed(4)} ETH`;
-      // Async resolve bidder name
+      // Async resolve bidder name (guarded against stale navigation)
       if (auc.bidder) {
         this.wallet.displayName(auc.bidder).then(name => {
+          if (stale()) return;
           const bidderEl = document.getElementById('stat-bidder');
           if (bidderEl) bidderEl.textContent = name;
         });
@@ -458,23 +535,26 @@ class App {
   async _submitSettle() {
     if (!this.current) return;
     const btn = document.getElementById('btn-settle');
-    const statusEl = document.getElementById('settle-status');
 
     btn.disabled = true;
-    statusEl.textContent = 'Awaiting wallet confirmation…';
-    statusEl.className = 'bid-status';
+    this._setSettleStatus('Awaiting wallet confirmation…');
 
     const receipt = await this.wallet.settleAuction(this.current.tokenId);
     if (receipt) {
-      statusEl.textContent = `Settled ✓  tx: ${receipt.hash.slice(0, 14)}…`;
-      statusEl.className = 'bid-status success';
+      this._setSettleStatus(`Settled ✓  tx: ${receipt.hash.slice(0, 14)}…`, 'success');
       // Reload auction state to reflect settlement
       setTimeout(() => this._loadAuction(this.current), 2000);
-    } else {
-      statusEl.className = 'bid-status error';
     }
+    // Error case is now handled by onError callback → _setSettleStatus
 
     btn.disabled = false;
+  }
+
+  _setSettleStatus(msg, type = '') {
+    const el = document.getElementById('settle-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'bid-status' + (type ? ` ${type}` : '');
   }
 
   _onBidPlaced(info) {

@@ -269,8 +269,26 @@ export class WalletManager {
         null,
         tokenId,
       );
-      const events = await this.auctionContract.queryFilter(filter, -50000);
-      const recent = events.slice(-limit).reverse();
+
+      // Base public RPC limits eth_getLogs to 10k blocks per request.
+      // Walk backward in 9,999-block chunks until we find events or
+      // exceed a reasonable search depth (~500k blocks ≈ ~12 days).
+      const head = await this.readProvider.getBlockNumber();
+      const MAX_DEPTH = 500_000;
+      const CHUNK = 9_999;
+      let allEvents = [];
+
+      for (let end = head; end > head - MAX_DEPTH && end > 0; end -= CHUNK) {
+        const start = Math.max(end - CHUNK + 1, 0);
+        try {
+          const chunk = await this.auctionContract.queryFilter(filter, start, end);
+          if (chunk.length) allEvents = chunk.concat(allEvents);
+        } catch (_e) {
+          // Skip failed chunks (rate-limit, etc.)
+        }
+      }
+
+      const recent = allEvents.slice(-limit).reverse();
 
       // Resolve timestamps and ENS names in parallel
       const enriched = await Promise.all(recent.map(async (e) => {

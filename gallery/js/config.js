@@ -38,9 +38,9 @@ export const AUCTION_ABI = [
   'function settleAuction(address _originContract, uint256 _tokenId)',
   'function cancelAuction(address _originContract, uint256 _tokenId)',
 
-  // Events
-  'event AuctionBid(address indexed _contractAddress, address indexed _bidder, uint256 indexed _tokenId, uint256 _amount, bool _startedAuction, uint256 _newAuctionLength, address _previousBidder)',
-  'event AuctionSettled(address indexed _contractAddress, address indexed _bidder, address _seller, uint256 indexed _tokenId, uint256 _amount)',
+  // Events (note: Base deployment includes _currencyAddress param)
+  'event AuctionBid(address indexed _contractAddress, address indexed _bidder, uint256 indexed _tokenId, address _currencyAddress, uint256 _amount, bool _startedAuction, uint256 _newAuctionLength, address _previousBidder)',
+  'event AuctionSettled(address indexed _contractAddress, address indexed _bidder, address _seller, uint256 indexed _tokenId, address _currencyAddress, uint256 _amount)',
   'event CancelAuction(address indexed _contractAddress, uint256 indexed _tokenId, address indexed _auctionCreator)',
 ];
 
@@ -63,7 +63,7 @@ export const PIECES = [
   {
     id:          'hex102',
     tokenId:     1,
-    title:       '⬡ hex102',
+    title:       '⬡ hex102 🥉',
     description: 'Hexagonal lattice with counter-rotating stripe layers. Neon pink/gold/green against earth tones. The geometry reads as impossible 2D motion: depth cues stripped by emissive rendering. Chain-reactive: bids accelerate scroll speed, gas shifts color temperature, settlement crystallizes the palette permanently.',
 
     thumbnailCid: 'Qmadkvb16QkLXN9dGSZzWD4wRy5f2nMBBnESacbSs9sgj2',
@@ -116,6 +116,11 @@ export const PIECES = [
     id:          'squares201',
     tokenId:     2,
     title:       '⬡ squares201',
+    sold: true,
+    soldTo: 'jcurve.eth',
+    soldToAddress: '0xa00E4ba46907FCbf84b3Ba22c7b5689e6DB827a0',
+    soldPrice: '0.006',
+    soldDate: '2026-04-03',
     description: 'Architectural corridor of flat surfaces receding to infinity. Spectral hot neons against warm blacks. One-point perspective creates an endless hallway where scrolling stripes generate the sensation of perpetual forward motion.',
 
     thumbnailCid: 'QmSQfS6f25S339ZY7HmZ2CvMHjLn8xWFa87Zxtuq9XgZUf',
@@ -214,6 +219,11 @@ export const PIECES = [
     id:          'pyramids101',
     tokenId:     4,
     title:       '⬡ pyramids101',
+    sold: true,
+    soldTo: '0x3A6E…dfA84',
+    soldToAddress: '0x3A6E99D804746F7ec5BC2CAfe9ca5670607dfA84',
+    soldPrice: '0.005',
+    soldDate: '2026-04-03',
     description: 'Bilateral mask-like forms from intersecting triangular and hexagonal prisms. Full spectrum wash against deep neon blacks. The geometry triggers pareidolia: an alien face or ceremonial totem that breathes as stripes scroll through it.',
 
     thumbnailCid: 'QmfAm8y38efyyWiGqASzYjH35xiQg5Ckn2LQvkZELv31K2',
